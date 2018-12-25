@@ -16,6 +16,7 @@
 
 package nextflow.processor
 
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Session
 import nextflow.cloud.aws.batch.AwsBatchExecutor
@@ -46,6 +47,8 @@ import nextflow.util.ServiceName
 class ProcessFactory {
 
     static public String DEFAULT_EXECUTOR = System.getenv('NXF_EXECUTOR') ?: 'local'
+
+    private Map<String,ProcessDef> processDefs = [:]
 
     /*
      * Map the executor class to its 'friendly' name
@@ -220,6 +223,18 @@ class ProcessFactory {
         if ( !script )
             throw new IllegalArgumentException("Missing script in the specified process block -- make sure it terminates with the script string to be executed")
 
+        // -- apply settings from config file to process config
+        applyConfig(name, processConfig, legacySettings)
+
+        // -- get the executor for the given process config
+        final execObj = createExecutor(name, processConfig, script)
+
+        // -- create processor class
+        newTaskProcessor( name, execObj, session, owner, processConfig, script )
+    }
+
+
+    private void applyConfig(String name, ProcessConfig processConfig, Map legacySettings=null) {
         // -- Apply the directives defined in the config object using the`withLabel:` syntax
         final processLabels = processConfig.getLabels() ?: ['']
         for( String lbl : processLabels ) {
@@ -243,7 +258,10 @@ class ProcessFactory {
             log.warn("Directives `scratch` and `stageInMode=rellink` conflict each other -- Enforcing default stageInMode for process `$name`")
             processConfig.remove('stageInMode')
         }
+    }
 
+    @PackageScope
+    Executor createExecutor( String name, ProcessConfig processConfig, TaskBody script ) {
         // -- load the executor to be used
         def execName = getExecutorName(processConfig) ?: DEFAULT_EXECUTOR
         def execClass = loadExecutorClass(execName)
@@ -259,11 +277,8 @@ class ProcessFactory {
         execObj.session = session
         execObj.name = execName
         execObj.init()
-
-        // -- create processor class
-        newTaskProcessor( name, execObj, session, owner, processConfig, script )
+        return execObj
     }
-
 
     /**
      * Find out the 'executor' to be used in the process definition or in teh session configuration object
@@ -285,5 +300,28 @@ class ProcessFactory {
 
         log.debug "<< taskConfig executor: $result"
         return result
+    }
+
+    def defineProcess(String name, Closure body) {
+        // the config object
+        final processConfig = new ProcessConfig(owner).setProcessName(name)
+
+        // Invoke the code block which will return the script closure to the executed.
+        // As side effect will set all the property declarations in the 'taskConfig' object.
+        processConfig.throwExceptionOnMissingProperty(true)
+        final copy = (Closure)body.clone()
+        copy.setResolveStrategy(Closure.DELEGATE_FIRST)
+        copy.setDelegate(processConfig)
+        final script = copy.call() as TaskBody
+        processConfig.throwExceptionOnMissingProperty(false)
+        if ( !script )
+            throw new IllegalArgumentException("Missing script in the specified process block -- make sure it terminates with the script string to be executed")
+
+        // apply config settings to the process
+        applyConfig(name, processConfig)
+
+        final process = new ProcessDef(owner, session, name, processConfig.clone(), script)
+        processDefs.put(name, process)
+        session.binding.setVariable(name, process)
     }
 }

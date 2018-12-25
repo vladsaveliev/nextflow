@@ -35,7 +35,7 @@ import nextflow.processor.ProcessConfig
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
-abstract class BaseParam {
+abstract class BaseParam implements Cloneable {
 
     final protected Binding binding
 
@@ -414,7 +414,6 @@ class FileInParam extends BaseInParam  {
             return value
     }
 
-
 }
 
 /**
@@ -567,7 +566,17 @@ final class DefaultInParam extends ValueInParam {
  * Container to hold all process outputs
  */
 @Slf4j
-class InputsList implements List<InParam> {
+class InputsList implements List<InParam>, Cloneable {
+
+    @Override
+    InputsList clone() {
+        def result = (InputsList)super.clone()
+        result.target = new ArrayList<>(target.size())
+        for( InParam param : target ) {
+            result.target.add((InParam)param.clone())
+        }
+        return result
+    }
 
     @Delegate
     private List<InParam> target = new LinkedList<>()

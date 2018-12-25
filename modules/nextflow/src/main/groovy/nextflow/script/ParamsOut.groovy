@@ -192,7 +192,6 @@ abstract class BaseOutParam extends BaseParam implements OutParam {
     }
 
 
-    @PackageScope
     BaseOutParam bind( def obj ) {
         if( obj instanceof TokenVar )
             this.nameObj = obj.name
@@ -633,7 +632,16 @@ final class DefaultOutParam extends StdOutParam {
 /**
  * Container to hold all process outputs
  */
-class OutputsList implements List<OutParam> {
+class OutputsList implements List<OutParam>, Cloneable {
+
+    @Override
+    OutputsList clone() {
+        def result = (OutputsList)super.clone()
+        result.target = new ArrayList<>(target.size())
+        for( OutParam param : target )
+            result.add((OutParam)param.clone())
+        return result
+    }
 
     @Delegate
     private List<OutParam> target = new LinkedList<>()

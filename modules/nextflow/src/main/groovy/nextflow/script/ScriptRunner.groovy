@@ -32,6 +32,7 @@ import nextflow.ast.NextflowXform
 import nextflow.config.ConfigBuilder
 import nextflow.exception.AbortOperationException
 import nextflow.exception.AbortRunException
+import nextflow.processor.ProcessFactory
 import nextflow.util.ConfigHelper
 import nextflow.util.Duration
 import nextflow.util.HistoryFile
@@ -308,10 +309,13 @@ class ScriptRunner {
         // set the script class-loader
         session.classLoader = gcl
 
-        // run and wait for termination
-        BaseScript result
         def groovy = new GroovyShell(gcl, session.binding, compilerConfig)
         scriptObj = groovy.parse(scriptText, session.scriptClassName) as BaseScript
+
+        // create the process factory
+        session.processFactory = new ProcessFactory(scriptObj, session)
+
+        return scriptObj
     }
 
     /**

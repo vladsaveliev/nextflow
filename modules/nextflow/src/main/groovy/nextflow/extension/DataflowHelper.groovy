@@ -19,6 +19,7 @@ package nextflow.extension
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.Dataflow
+import groovyx.gpars.dataflow.DataflowChannel
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowVariable
@@ -42,6 +43,28 @@ import static java.util.Arrays.asList
 class DataflowHelper {
 
     private static Session getSession() { Global.getSession() as Session }
+
+    /**
+     * Create a dataflow object by the type of the specified source argument
+     *
+     * @param source
+     * @return
+     */
+    static <V> DataflowChannel<V> newChannelBy(DataflowReadChannel<?> source) {
+
+        switch( source ) {
+            case DataflowExpression:
+                return new DataflowVariable<V>()
+
+            case DataflowQueue:
+                return new DataflowQueue<V>()
+
+            default:
+                throw new IllegalArgumentException()
+        }
+
+    }
+
 
     /**
      * Check if a {@code DataflowProcessor} is active

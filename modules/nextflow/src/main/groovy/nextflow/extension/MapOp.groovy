@@ -21,6 +21,10 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.Channel
+
+import static nextflow.extension.DataflowHelper.newChannelBy
+
+
 /**
  * Implements {@link DataflowExtensions#map(groovyx.gpars.dataflow.DataflowReadChannel, groovy.lang.Closure)} operator
  *
@@ -40,7 +44,7 @@ class MapOp {
     DataflowChannel apply() {
 
         final stopOnFirst = source instanceof DataflowExpression
-        final target = DataflowExtensions.newChannelBy(source)
+        final target = newChannelBy(source)
         DataflowHelper.newOperator(source, target) { it ->
 
             def result = mapper.call(it)

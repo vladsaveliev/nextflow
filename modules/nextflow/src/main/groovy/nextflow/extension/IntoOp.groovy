@@ -29,6 +29,9 @@ import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.Channel
 import nextflow.Global
 import nextflow.Session
+
+import static nextflow.extension.DataflowHelper.newChannelBy
+
 /**
  * Implements the {@link DataflowExtensions#into} operators logic
  *
@@ -78,7 +81,7 @@ class IntoOp {
 
         def targets = []
         names.each { identifier ->
-            def channel = DataflowExtensions.newChannelBy(source)
+            def channel = newChannelBy(source)
             targets.add(channel)
             binding.setVariable(identifier, channel)
         }

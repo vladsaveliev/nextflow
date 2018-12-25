@@ -50,7 +50,7 @@ import nextflow.script.ValueOutParam
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
-class ProcessConfig implements Map<String,Object> {
+class ProcessConfig implements Map<String,Object>, Cloneable {
 
     static final public transient LABEL_REGEXP = ~/[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9]+)?/
 
@@ -124,7 +124,7 @@ class ProcessConfig implements Map<String,Object> {
      */
     @Delegate
     @PackageScope
-    protected final Map<String,Object> configProperties
+    protected Map<String,Object> configProperties
 
     /**
      * Reference to the main script object
@@ -167,6 +167,15 @@ class ProcessConfig implements Map<String,Object> {
     @PackageScope
     ProcessConfig( Map delegate ) {
         configProperties = delegate
+    }
+
+    @Override
+    ProcessConfig clone() {
+        def copy = (ProcessConfig)super.clone()
+        copy.@configProperties = new LinkedHashMap<>(configProperties)
+        copy.@inputs = inputs.clone()
+        copy.@outputs = outputs.clone()
+        return copy
     }
 
     /**
@@ -243,6 +252,7 @@ class ProcessConfig implements Map<String,Object> {
         return this
     }
 
+    @Override
     Object getProperty( String name ) {
 
         switch( name ) {
