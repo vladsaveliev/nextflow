@@ -51,4 +51,32 @@ class BaseScriptTest extends Specification {
         result.val == 'echo Hello world'
     }
 
+    def 'should define a process with multiple inputs' () {
+        given:
+        def SCRIPT = '''
+        processDef foo {
+          input: 
+            val sample
+            set pairId, reads
+          output: 
+            stdout() 
+          script:
+            /echo sample=$sample pairId=$pairId reads=$reads/
+        }
+        
+        ch1 = Channel.from('world')
+        ch2 = Channel.value(['x', '/some/file'])
+        
+        foo(ch1, ch2)
+        '''
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo sample=world pairId=x reads=/some/file'
+    }
+
 }

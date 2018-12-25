@@ -17,12 +17,14 @@
 package nextflow.processor
 
 import groovy.transform.CompileStatic
-import groovyx.gpars.dataflow.DataflowChannel
-import groovyx.gpars.dataflow.DataflowReadChannel
+import groovyx.gpars.dataflow.DataflowQueue
+import groovyx.gpars.dataflow.DataflowVariable
 import nextflow.Session
 import nextflow.script.BaseScript
+import nextflow.script.EachInParam
+import nextflow.script.InputsList
+import nextflow.script.OutputsList
 import nextflow.script.TaskBody
-import static nextflow.extension.DataflowHelper.newChannelBy
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -40,12 +42,18 @@ class ProcessDef extends Closure {
 
     private TaskBody body
 
+    private InputsList inputs
+
+    private OutputsList outputs
+
     ProcessDef(BaseScript owner, Session session, String name, ProcessConfig config, TaskBody body) {
         super(owner)
         this.session = session
         this.name = name
         this.config = config
         this.body = body
+        this.inputs = config.getInputs()
+        this.outputs = config.getOutputs()
     }
 
     BaseScript getOwner() {
@@ -60,16 +68,42 @@ class ProcessDef extends Closure {
 
     @Override
     Object call(final Object arg) {
-        assert arg instanceof DataflowReadChannel
-        assert config.getInputs().size()==1
-        assert config.getOutputs().size() < 2
+        run(arg)
+    }
 
-        config.getInputs().get(0).from(arg)
+    @Override
+    Object call(final Object... args) {
+        run(args)
+    }
 
-        DataflowChannel result=null
-        if( config.getOutputs().size()==1 ) {
-            result = newChannelBy(arg)
-            config.getOutputs().get(0).into(result)
+    @Override
+    Object call() {
+        run()
+    }
+
+    protected run(Object... args) {
+        // sanity check
+        if( args.size() != inputs.size() )
+            throw new IllegalArgumentException("Process `$name` declares ${inputs.size()} input channels but ${args.size()} were specified")
+
+        // set input channels
+        for( int i=0; i<args.size(); i++ ) {
+            inputs[i].from(args[i])
+        }
+
+        // set output channels
+        List result = null
+        if( outputs.size() ) {
+            result = new ArrayList(outputs.size())
+            final allScalarValues = inputs.allScalarInputs()
+            final hasEachParams = inputs.any { it instanceof EachInParam }
+            final singleton = allScalarValues && !hasEachParams
+
+            for( int i=0; i<outputs.size(); i++ ) {
+                def ch = singleton ? new DataflowVariable<>() : new DataflowQueue<>()
+                result.add(ch)
+                outputs[i].into(ch)
+            }
         }
 
         // create the executor
@@ -81,18 +115,13 @@ class ProcessDef extends Closure {
                 .newTaskProcessor(name, executor, session, owner, config, body)
                 .run()
 
-        return result
-    }
+        // the result object 
+        if( result.size()==1 )
+            return result[0]
+        else if( result.size()>1 )
+            return result
+        else
+            return null
 
-    @Override
-    Object call(final Object... args) {
-        println "Call 2"
-        return null
-    }
-
-    @Override
-    Object call() {
-        println "Call 3"
-        throw new UnsupportedOperationException()
     }
 }
