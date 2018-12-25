@@ -19,7 +19,6 @@ package nextflow.extension
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
-import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.agent.Agent
 import groovyx.gpars.dataflow.DataflowBroadcast
@@ -50,6 +49,8 @@ import static DataflowHelper.reduceImpl
 import static DataflowHelper.subscribeImpl
 import static nextflow.splitter.SplitterFactory.countOverChannel
 import static nextflow.util.CheckHelper.checkParams
+import static nextflow.extension.DataflowHelper.newChannelBy
+
 /**
  * A set of operators inspired to RxJava extending the methods available on DataflowChannel
  * data structure
@@ -81,28 +82,6 @@ class DataflowExtensions {
 
     }
 
-
-    /**
-     * Create a dataflow object by the type of the specified source argument
-     *
-     * @param source
-     * @return
-     */
-    @PackageScope
-    static <V> DataflowChannel<V> newChannelBy(DataflowReadChannel<?> source) {
-
-        switch( source ) {
-            case DataflowExpression:
-                return new DataflowVariable<V>()
-
-            case DataflowQueue:
-                return new DataflowQueue<V>()
-
-            default:
-                throw new IllegalArgumentException()
-        }
-
-    }
 
     /**
      * Subscribe *onNext* event

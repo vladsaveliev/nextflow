@@ -259,7 +259,6 @@ class TaskProcessor {
         this.config = config
         this.taskBody = taskBody
         this.name = name
-
     }
 
     /**

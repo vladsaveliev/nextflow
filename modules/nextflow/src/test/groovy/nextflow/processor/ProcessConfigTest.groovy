@@ -552,4 +552,49 @@ class ProcessConfigTest extends Specification {
 
     }
 
+    def 'should clone config object' () {
+
+        given:
+        def config = new ProcessConfig(Mock(BaseScript))
+
+        when:
+        config.queue 'cn-el6'
+        config.container 'ubuntu:latest'
+        config.memory '10 GB'
+        config._in_val('foo')
+        config._in_file('sample.txt')
+        config._out_file('result.txt')
+        
+        then:
+        config.queue == 'cn-el6'
+        config.container == 'ubuntu:latest'
+        config.memory == '10 GB'
+        config.getInputs().size()==2
+        config.getOutputs().size()==1
+
+        when:
+        def copy = config.clone()
+        copy.queue 'long'
+        copy.container 'debian:wheezy'
+        copy.memory '5 GB'
+        copy._in_val('bar')
+        copy._out_file('sample.bam')
+
+        then:
+        copy.queue == 'long'
+        copy.container == 'debian:wheezy'
+        copy.memory == '5 GB'
+        copy.getInputs().size()==3
+        copy.getOutputs().size()==2
+
+        // original config is not affected
+        config.queue == 'cn-el6'
+        config.container == 'ubuntu:latest'
+        config.memory == '10 GB'
+        config.getInputs().size()==2
+        config.getOutputs().size()==1
+
+
+    }
+
 }

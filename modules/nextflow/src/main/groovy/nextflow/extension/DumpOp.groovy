@@ -18,6 +18,7 @@ package nextflow.extension
 
 import org.codehaus.groovy.runtime.InvokerHelper
 import static nextflow.util.CheckHelper.checkParams
+import static nextflow.extension.DataflowHelper.newChannelBy
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
@@ -74,7 +75,7 @@ class DumpOp {
             return source
         }
 
-        final target = DataflowExtensions.newChannelBy(source)
+        final target = newChannelBy(source)
         final events = new HashMap(2)
         events.onNext = {
             def marker = 'DUMP'

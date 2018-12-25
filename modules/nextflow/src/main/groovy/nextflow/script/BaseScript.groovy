@@ -18,7 +18,6 @@ package nextflow.script
 import groovy.transform.PackageScope
 import nextflow.Global
 import nextflow.Session
-import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
  * Any user defined script will extends this class, it provides the base execution context
@@ -88,19 +87,6 @@ abstract class BaseScript extends Script {
     @PackageScope
     Object getResult() { result }
 
-    private ProcessFactory processFactory
-
-    private getProcessFactory() {
-        if( !processFactory ) {
-            processFactory = new ProcessFactory(this, getSession())
-        }
-        return processFactory
-    }
-
-    @PackageScope
-    void setProcessFactory( ProcessFactory value ) {
-        this.processFactory = value
-    }
 
     /**
      * Enable disable task 'echo' configuration property
@@ -125,7 +111,7 @@ abstract class BaseScript extends Script {
      */
     protected process( Map<String,?> args, String name, Closure body ) {
         // create the process
-        taskProcessor = getProcessFactory().createProcessor(name, body, args)
+        taskProcessor = getSession().getProcessFactory().createProcessor(name, body, args)
         // launch it
         result = taskProcessor.run()
     }
@@ -143,9 +129,12 @@ abstract class BaseScript extends Script {
      */
     protected process( String name, Closure body ) {
         // create the process
-        taskProcessor = getProcessFactory().createProcessor(name, body)
+        taskProcessor = getSession().getProcessFactory().createProcessor(name, body)
         // launch it
         result = taskProcessor.run()
     }
 
+    protected processDef( String name, Closure body ) {
+        getSession().getProcessFactory().defineProcess(name,body)
+    }
 }

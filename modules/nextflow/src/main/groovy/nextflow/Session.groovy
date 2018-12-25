@@ -42,6 +42,7 @@ import nextflow.exception.MissingLibraryException
 import nextflow.file.FileHelper
 import nextflow.processor.ErrorStrategy
 import nextflow.processor.ProcessConfig
+import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskDispatcher
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
@@ -78,6 +79,11 @@ class Session implements ISession {
      * Keep a list of all processor created
      */
     final Collection<DataflowProcessor> allOperators = new ConcurrentLinkedQueue<>()
+
+    /**
+     * The object that cretes process instances
+     */
+    ProcessFactory processFactory
 
     /**
      * Dispatch tasks for executions

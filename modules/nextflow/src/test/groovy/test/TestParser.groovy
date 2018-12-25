@@ -76,7 +76,7 @@ class TestParser {
         def script = groovy.parse( scriptText ) as BaseScript
         // initialize it
         script.setSession(session)
-        script.setProcessFactory(new MockProcessFactory(script, session))
+        session.processFactory = new MockProcessFactory(script, session)
         // return it
         return script
     }
