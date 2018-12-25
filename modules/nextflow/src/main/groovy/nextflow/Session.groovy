@@ -48,10 +48,10 @@ import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.script.ScriptBinding
+import nextflow.trace.AnsiLogObserver
 import nextflow.trace.GraphObserver
 import nextflow.trace.ReportObserver
 import nextflow.trace.StatsObserver
-import nextflow.trace.AnsiLogObserver
 import nextflow.trace.TimelineObserver
 import nextflow.trace.TraceFileObserver
 import nextflow.trace.TraceObserver
@@ -1151,5 +1151,17 @@ class Session implements ISession {
         return find.invoke(ClassLoader.getSystemClassLoader(), className)
     }
 
+
+    def invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
+        def proc = processFactory.getProcessDef(methodName)
+        if( !proc )
+            throw MISSING_METHOD
+        def aa = new Object[args.size()+1]
+        aa[0] = channel
+        for( int i=0; i<args.size(); i++ )
+            aa[i+1] = args[i]
+
+        proc.call(aa)
+    }
 
 }

@@ -17,7 +17,6 @@
 package nextflow
 
 import java.nio.file.Path
-
 /**
  * Nextflow session interface
  *
@@ -63,5 +62,7 @@ interface ISession {
     boolean isCacheable()
 
     boolean isResumeMode()
+
+    Object invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD)
 
 }
