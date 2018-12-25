@@ -27,6 +27,7 @@ import groovy.lang.MetaClass;
 import groovy.lang.MissingMethodException;
 import groovyx.gpars.dataflow.DataflowReadChannel;
 import groovyx.gpars.dataflow.DataflowWriteChannel;
+import nextflow.Global;
 import nextflow.extension.DataflowExtensions;
 import nextflow.file.FileHelper;
 
@@ -87,6 +88,9 @@ public class NextflowDelegatingMetaClass extends groovy.lang.DelegatingMetaClass
             if( checkOpenArrayDataflowMethod(NAMES, obj, methodName, args) ) {
                 Object[] newArgs = new Object[] { toListOfChannel(args), args[len - 1] };
                 return delegate.invokeMethod(obj, methodName, newArgs);
+            }
+            else if( obj instanceof DataflowReadChannel ) {
+                return Global.getSession().invokeCustomMethod(obj, methodName, args, e1);
             }
             else
                 throw e1;

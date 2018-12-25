@@ -79,4 +79,28 @@ class BaseScriptTest extends Specification {
         result.val == 'echo sample=world pairId=x reads=/some/file'
     }
 
+    def 'should define and invoke as an operator' () {
+        given:
+        def SCRIPT = '''
+        processDef foo {
+          input: val sample
+          output: stdout() 
+          script:
+          /echo Hello $sample/
+        }
+        
+        Channel.from('world').foo()
+        
+        '''
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo Hello world'
+    }
+
+
 }

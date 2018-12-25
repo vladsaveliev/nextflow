@@ -324,4 +324,8 @@ class ProcessFactory {
         processDefs.put(name, process)
         session.binding.setVariable(name, process)
     }
+
+    ProcessDef getProcessDef(String name) {
+        processDefs.get(name)
+    }
 }
