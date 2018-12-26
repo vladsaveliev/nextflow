@@ -102,5 +102,45 @@ class BaseScriptTest extends Specification {
         result.val == 'echo Hello world'
     }
 
+    def 'should compose processes' () {
+
+        given:
+        def SCRIPT = '''
+        processDef foo {
+          input: 
+            val alpha
+          output: 
+            val delta
+            val gamma
+          script:
+            delta = alpha
+            gamma = 'world'
+            /nope/
+        }
+        
+        processDef bar {
+           input:
+             val xx
+             val yy 
+           output:
+             stdout()
+           script:
+            /echo $xx $yy/            
+        }
+        
+        bar(foo('Ciao'))
+        
+        '''
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo Ciao world'
+
+    }
+
 
 }

@@ -92,16 +92,18 @@ class ProcessDef extends Closure {
         }
 
         // set output channels
-        List result = null
+        // note: the result object must be an array instead of a List to allow process
+        // composition ie. to use the process output as the input in another process invocation
+        Object[] result = null
         if( outputs.size() ) {
-            result = new ArrayList(outputs.size())
+            result = new Object[outputs.size()]
             final allScalarValues = inputs.allScalarInputs()
             final hasEachParams = inputs.any { it instanceof EachInParam }
             final singleton = allScalarValues && !hasEachParams
 
             for( int i=0; i<outputs.size(); i++ ) {
                 def ch = singleton ? new DataflowVariable<>() : new DataflowQueue<>()
-                result.add(ch)
+                result[i] = ch
                 outputs[i].into(ch)
             }
         }
@@ -115,13 +117,13 @@ class ProcessDef extends Closure {
                 .newTaskProcessor(name, executor, session, owner, config, body)
                 .run()
 
-        // the result object 
+        // the result object
+        if( !result )
+            return null
         if( result.size()==1 )
             return result[0]
-        else if( result.size()>1 )
-            return result
         else
-            return null
+            return result
 
     }
 }
