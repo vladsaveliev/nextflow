@@ -42,7 +42,7 @@ import nextflow.exception.MissingLibraryException
 import nextflow.file.FileHelper
 import nextflow.processor.ErrorStrategy
 import nextflow.processor.ProcessConfig
-import nextflow.processor.ProcessFactory
+import nextflow.processor.ProcessLibrary
 import nextflow.processor.TaskDispatcher
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
@@ -81,9 +81,9 @@ class Session implements ISession {
     final Collection<DataflowProcessor> allOperators = new ConcurrentLinkedQueue<>()
 
     /**
-     * The object that cretes process instances
+     * Keep process definitions included as external modules
      */
-    ProcessFactory processFactory
+    ProcessLibrary library
 
     /**
      * Dispatch tasks for executions
@@ -341,12 +341,14 @@ class Session implements ISession {
 
         // set the byte-code target directory
         this.classesDir = FileHelper.createLocalDir()
-
+        this.library = new ProcessLibrary(this)
         this.observers = createObservers()
         this.statsEnabled = observers.any { it.enableMetrics() }
 
         cache = new CacheDB(uniqueId,runName).open()
     }
+
+    ProcessLibrary getLibrary() { library }
 
     /**
      * Given the `run` command line options creates the required {@link TraceObserver}s
@@ -1152,16 +1154,8 @@ class Session implements ISession {
     }
 
 
-    def invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
-        def proc = processFactory.getProcessDef(methodName)
-        if( !proc )
-            throw MISSING_METHOD
-        def aa = new Object[args.size()+1]
-        aa[0] = channel
-        for( int i=0; i<args.size(); i++ )
-            aa[i+1] = args[i]
-
-        proc.call(aa)
+    Object invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
+        library.invoke(channel,methodName,args,MISSING_METHOD)
     }
 
 }

@@ -59,6 +59,8 @@ class ProcessDef extends Closure {
         return (BaseScript)super.getOwner()
     }
 
+    String getName() { name }
+
     @Override
     int getMaximumNumberOfParameters() { return 0 }
 

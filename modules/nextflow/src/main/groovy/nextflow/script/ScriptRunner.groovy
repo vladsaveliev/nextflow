@@ -311,10 +311,8 @@ class ScriptRunner {
 
         def groovy = new GroovyShell(gcl, session.binding, compilerConfig)
         scriptObj = groovy.parse(scriptText, session.scriptClassName) as BaseScript
-
         // create the process factory
-        session.processFactory = new ProcessFactory(scriptObj, session)
-
+        scriptObj.setProcessFactory(new ProcessFactory(scriptObj, session))
         return scriptObj
     }
 
