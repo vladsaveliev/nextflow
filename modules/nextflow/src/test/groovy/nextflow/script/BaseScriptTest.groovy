@@ -18,6 +18,8 @@ package nextflow.script
 
 import spock.lang.Specification
 
+import java.nio.file.Files
+
 import groovyx.gpars.dataflow.DataflowReadChannel
 
 /**
@@ -140,6 +142,36 @@ class BaseScriptTest extends Specification {
         result instanceof DataflowReadChannel
         result.val == 'echo Ciao world'
 
+    }
+
+    def 'should import library' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def module = folder.resolve('module.nf')
+        module.text = '''
+        processDef foo {
+          input: val sample
+          output: stdout() 
+          script:
+          /echo Hello $sample/
+        }
+        '''
+
+        def SCRIPT = """
+        importLibrary '$module'
+        Channel.from('world').foo()
+        """
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo Hello world'
+
+        cleanup:
+        folder?.deleteDir()
     }
 
 

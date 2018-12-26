@@ -16,6 +16,8 @@
 
 package nextflow.processor
 
+import java.nio.file.Path
+
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Session
@@ -324,5 +326,9 @@ class ProcessFactory {
         session.library.register(process)
     }
 
+    void importLibrary( path ) {
+        assert path
+        session.getScriptParser().parse(path as Path).run()
+    }
 
 }

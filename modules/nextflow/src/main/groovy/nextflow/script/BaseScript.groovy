@@ -16,7 +16,6 @@
 
 package nextflow.script
 
-import java.nio.file.Path
 
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
@@ -58,9 +57,7 @@ abstract class BaseScript extends Script {
     }
 
     @PackageScope
-    List<String> getProcessNames() {
-        processNames
-    }
+    List<String> getProcessNames() { processNames }
 
     /**
      * Holds the configuration object which will used to execution the user tasks
@@ -135,4 +132,9 @@ abstract class BaseScript extends Script {
     protected void processDef( String name, Closure body ) {
         processFactory.defineProcess(name,body)
     }
+
+    protected void importLibrary(path) {
+        processFactory.importLibrary(path)
+    }
+
 }
