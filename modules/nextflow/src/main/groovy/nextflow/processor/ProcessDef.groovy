@@ -19,7 +19,6 @@ package nextflow.processor
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
-import nextflow.Session
 import nextflow.script.BaseScript
 import nextflow.script.EachInParam
 import nextflow.script.InputsList
@@ -34,24 +33,24 @@ class ProcessDef extends Closure {
 
     private static Class[] EMPTY = []
 
-    private Session session
-
     private String name
 
-    private ProcessConfig config
+    private ProcessFactory processFactory
 
-    private TaskBody body
+    private ProcessConfig processConfig
+
+    private TaskBody taskBody
 
     private InputsList inputs
 
     private OutputsList outputs
 
-    ProcessDef(BaseScript owner, Session session, String name, ProcessConfig config, TaskBody body) {
+    ProcessDef(BaseScript owner, String name, ProcessFactory factory, ProcessConfig config, TaskBody body) {
         super(owner)
-        this.session = session
         this.name = name
-        this.config = config
-        this.body = body
+        this.processFactory = factory
+        this.processConfig = config
+        this.taskBody = body
         this.inputs = config.getInputs()
         this.outputs = config.getOutputs()
     }
@@ -109,12 +108,11 @@ class ProcessDef extends Closure {
         }
 
         // create the executor
-        final executor = session.processFactory.createExecutor(name, config, body)
+        final executor = processFactory.createExecutor(name, processConfig, taskBody)
 
         // -- create processor class
-        session
-                .processFactory
-                .newTaskProcessor(name, executor, session, owner, config, body)
+        processFactory
+                .newTaskProcessor(name, executor, processConfig, taskBody)
                 .run()
 
         // the result object

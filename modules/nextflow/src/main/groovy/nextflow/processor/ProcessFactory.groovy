@@ -94,6 +94,8 @@ class ProcessFactory {
         }
     }
 
+    Session getSession() { session }
+
     /**
      * Create a new task processor and initialise with the given parameters
      *
@@ -105,8 +107,8 @@ class ProcessFactory {
      * @param taskBody The process task body
      * @return An instance of {@link TaskProcessor}
      */
-    protected TaskProcessor newTaskProcessor( String name, Executor executor, Session session, BaseScript script, ProcessConfig config, TaskBody taskBody ) {
-        new TaskProcessor(name, executor, session, script, config, taskBody)
+    protected TaskProcessor newTaskProcessor( String name, Executor executor, ProcessConfig config, TaskBody taskBody ) {
+        new TaskProcessor(name, executor, session, owner, config, taskBody)
     }
 
     /**
@@ -230,7 +232,7 @@ class ProcessFactory {
         final execObj = createExecutor(name, processConfig, script)
 
         // -- create processor class
-        newTaskProcessor( name, execObj, session, owner, processConfig, script )
+        newTaskProcessor( name, execObj, processConfig, script )
     }
 
 
@@ -320,7 +322,7 @@ class ProcessFactory {
         // apply config settings to the process
         applyConfig(name, processConfig)
 
-        final process = new ProcessDef(owner, session, name, processConfig.clone(), script)
+        final process = new ProcessDef(owner, name, this, processConfig.clone(), script)
         processDefs.put(name, process)
         session.binding.setVariable(name, process)
     }
