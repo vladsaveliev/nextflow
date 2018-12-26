@@ -18,30 +18,18 @@ package nextflow.script
 
 import java.nio.file.Path
 
-import com.google.common.hash.Hashing
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
-import nextflow.Channel
 import nextflow.Const
-import nextflow.Nextflow
 import nextflow.Session
-import nextflow.ast.NextflowDSL
-import nextflow.ast.NextflowXform
 import nextflow.config.ConfigBuilder
 import nextflow.exception.AbortOperationException
 import nextflow.exception.AbortRunException
-import nextflow.processor.ProcessFactory
-import nextflow.util.ConfigHelper
-import nextflow.util.Duration
 import nextflow.util.HistoryFile
-import nextflow.util.MemoryUnit
 import nextflow.util.VersionNumber
-import org.apache.commons.lang.StringUtils
 import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
-import org.codehaus.groovy.control.customizers.ImportCustomizer
 import static nextflow.util.ConfigHelper.parseValue
 /**
  * Application main class
@@ -90,6 +78,7 @@ class ScriptRunner {
     /**
      * Groovy compiler config object used to parse the nextflow script
      */
+    @Deprecated
     private CompilerConfiguration compilerConfig
 
     /**
@@ -258,7 +247,6 @@ class ScriptRunner {
 
         session.binding.setArgs( new ArgsList(args) )
         session.binding.setParams( (Map)session.config.params )
-        // TODO add test for this property
         session.binding.setVariable( 'baseDir', session.baseDir )
         session.binding.setVariable( 'workDir', session.workDir )
         if( scriptFile ) {
@@ -267,25 +255,6 @@ class ScriptRunner {
             session.binding.setVariable( 'nextflow', meta.nextflow )
         }
 
-        // generate an unique class name
-        session.scriptClassName = generateClassName(scriptText)
-
-        // define the imports
-        def importCustomizer = new ImportCustomizer()
-        importCustomizer.addImports( StringUtils.name, groovy.transform.Field.name )
-        importCustomizer.addImports( Path.name )
-        importCustomizer.addImports( Channel.name )
-        importCustomizer.addImports( Duration.name )
-        importCustomizer.addImports( MemoryUnit.name )
-        importCustomizer.addStaticStars( Nextflow.name )
-
-        compilerConfig = new CompilerConfiguration()
-        compilerConfig.addCompilationCustomizers( importCustomizer )
-        compilerConfig.scriptBaseClass = BaseScript.class.name
-        compilerConfig.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowDSL))
-        compilerConfig.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowXform))
-
-        compilerConfig.setTargetDirectory(session.classesDir.toFile())
         return this
     }
 
@@ -296,38 +265,9 @@ class ScriptRunner {
 
     protected BaseScript parseScript( String scriptText ) {
         log.debug "> Script parsing"
-
-        // extend the class-loader if required
-        def gcl = new GroovyClassLoader()
-        def libraries = ConfigHelper.resolveClassPaths( session.getLibDir() )
-
-        libraries?.each { Path lib -> def path = lib.complete()
-            log.debug "Adding to the classpath library: ${path}"
-            gcl.addClasspath(path.toString())
-        }
-
-        // set the script class-loader
-        session.classLoader = gcl
-
-        def groovy = new GroovyShell(gcl, session.binding, compilerConfig)
-        scriptObj = groovy.parse(scriptText, session.scriptClassName) as BaseScript
-        // create the process factory
-        scriptObj.setProcessFactory(new ProcessFactory(scriptObj, session))
+        scriptObj = session.getScriptParser().parse(scriptText)
+        session.scriptClassName = scriptObj.class.simpleName
         return scriptObj
-    }
-
-    /**
-     * Creates a unique name for the main script class in order to avoid collision
-     * with the implicit and user variables
-     */
-    @PackageScope String generateClassName(String text) {
-        def hash = Hashing
-                .murmur3_32()
-                .newHasher()
-                .putUnencodedChars(text)
-                .hash()
-
-        return "_nf_script_${hash}"
     }
 
     /**

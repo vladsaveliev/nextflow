@@ -48,6 +48,7 @@ import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.script.ScriptBinding
+import nextflow.script.ScriptParser
 import nextflow.trace.AnsiLogObserver
 import nextflow.trace.GraphObserver
 import nextflow.trace.ReportObserver
@@ -180,8 +181,6 @@ class Session implements ISession {
     private volatile Throwable error
 
     private ScriptBinding binding
-
-    private ClassLoader classLoader
 
     private Queue<Closure<Void>> shutdownCallbacks = new ConcurrentLinkedQueue<>()
 
@@ -519,11 +518,27 @@ class Session implements ISession {
 
     ScriptBinding getBinding() { binding }
 
-    ClassLoader getClassLoader() { classLoader }
+    @Memoized
+    ClassLoader getClassLoader() { getClassLoader0() }
 
-    Session setClassLoader( ClassLoader loader ) {
-        this.classLoader = loader
-        return this
+    @PackageScope
+    ClassLoader getClassLoader0() {
+        // extend the class-loader if required
+        final gcl = new GroovyClassLoader()
+        final libraries = ConfigHelper.resolveClassPaths(getLibDir())
+
+        for( Path lib : libraries ) {
+            def path = lib.complete()
+            log.debug "Adding to the classpath library: ${path}"
+            gcl.addClasspath(path.toString())
+        }
+
+        return gcl
+    }
+
+    @Memoized
+    ScriptParser getScriptParser() {
+        new ScriptParser(this, binding)
     }
 
     Barrier getBarrier() { monitorsBarrier }
