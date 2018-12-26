@@ -48,8 +48,6 @@ class ProcessFactory {
 
     static public String DEFAULT_EXECUTOR = System.getenv('NXF_EXECUTOR') ?: 'local'
 
-    private Map<String,ProcessDef> processDefs = [:]
-
     /*
      * Map the executor class to its 'friendly' name
      */
@@ -304,7 +302,7 @@ class ProcessFactory {
         return result
     }
 
-    def defineProcess(String name, Closure body) {
+    void defineProcess(String name, Closure body) {
         // the config object
         final processConfig = new ProcessConfig(owner).setProcessName(name)
 
@@ -323,11 +321,8 @@ class ProcessFactory {
         applyConfig(name, processConfig)
 
         final process = new ProcessDef(owner, name, this, processConfig.clone(), script)
-        processDefs.put(name, process)
-        session.binding.setVariable(name, process)
+        session.library.register(process)
     }
 
-    ProcessDef getProcessDef(String name) {
-        processDefs.get(name)
-    }
+
 }

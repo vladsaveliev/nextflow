@@ -15,15 +15,19 @@
  */
 
 package nextflow.script
+
+import java.nio.file.Path
+
 import groovy.transform.PackageScope
-import nextflow.Global
-import nextflow.Session
+import groovy.util.logging.Slf4j
+import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
  * Any user defined script will extends this class, it provides the base execution context
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@Slf4j
 abstract class BaseScript extends Script {
 
     protected BaseScript() { }
@@ -40,10 +44,7 @@ abstract class BaseScript extends Script {
         this.processNames = processNames
     }
 
-    /*
-     * The script execution session, declare it private to prevent the user script to be able to access it
-     */
-    private Session sessionObj
+    private ProcessFactory processFactory
 
     /**
      * The list of process defined in the pipeline script
@@ -51,15 +52,9 @@ abstract class BaseScript extends Script {
     private List<String> processNames
 
     @PackageScope
-    void setSession( Session value )  {
-        sessionObj = value
-    }
-
-    private Session getSession() {
-        if( !sessionObj ) {
-            sessionObj = Global.session as Session
-        }
-        return sessionObj
+    BaseScript setProcessFactory( ProcessFactory factory )  {
+        processFactory = factory
+        return this
     }
 
     @PackageScope
@@ -70,7 +65,10 @@ abstract class BaseScript extends Script {
     /**
      * Holds the configuration object which will used to execution the user tasks
      */
-    Map getConfig() { getSession().getConfig() }
+    Map getConfig() {
+        log.warn "The access of `config` object is deprecated"
+        processFactory.getSession().getConfig()
+    }
 
     @Lazy
     InputStream stdin = { System.in }()
@@ -111,7 +109,7 @@ abstract class BaseScript extends Script {
      */
     protected process( Map<String,?> args, String name, Closure body ) {
         // create the process
-        taskProcessor = getSession().getProcessFactory().createProcessor(name, body, args)
+        taskProcessor = processFactory.createProcessor(name, body, args)
         // launch it
         result = taskProcessor.run()
     }
@@ -129,12 +127,12 @@ abstract class BaseScript extends Script {
      */
     protected process( String name, Closure body ) {
         // create the process
-        taskProcessor = getSession().getProcessFactory().createProcessor(name, body)
+        taskProcessor = processFactory.createProcessor(name, body)
         // launch it
         result = taskProcessor.run()
     }
 
-    protected processDef( String name, Closure body ) {
-        getSession().getProcessFactory().defineProcess(name,body)
+    protected void processDef( String name, Closure body ) {
+        processFactory.defineProcess(name,body)
     }
 }

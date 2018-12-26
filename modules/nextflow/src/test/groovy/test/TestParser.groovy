@@ -75,8 +75,7 @@ class TestParser {
         def groovy = new GroovyShell(gcl, binding, config)
         def script = groovy.parse( scriptText ) as BaseScript
         // initialize it
-        script.setSession(session)
-        session.processFactory = new MockProcessFactory(script, session)
+        script.setProcessFactory(new MockProcessFactory(script, session))
         // return it
         return script
     }
@@ -95,10 +94,19 @@ class TestParser {
     }
 
 
-    @InheritConstructors
-    static class MockProcessFactory extends ProcessFactory  {
+    static class MockProcessFactory extends ProcessFactory {
 
-        TaskProcessor newTaskProcessor( String name, Executor executor, Session session, BaseScript script, ProcessConfig config, TaskBody taskBody ) {
+        BaseScript script
+        Session session
+
+        MockProcessFactory(BaseScript script, Session session) {
+            super(script,session)
+            this.script = script
+            this.session = session
+        }
+
+        @Override
+        TaskProcessor newTaskProcessor( String name, Executor executor, ProcessConfig config, TaskBody taskBody ) {
             new MockTaskProcessor(name, executor, session, script, config, taskBody)
         }
 
