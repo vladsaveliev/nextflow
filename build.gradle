@@ -59,7 +59,7 @@ allprojects {
     apply plugin: 'java'
     apply plugin: 'idea'
 
-    version = /19.1.0-SNAPSHOT/
+    version = /19.0.modules-draft2-SNAPSHOT/
     group = 'io.nextflow'
 
     sourceCompatibility = 1.8
