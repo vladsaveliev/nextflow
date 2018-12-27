@@ -16,6 +16,7 @@
 
 package nextflow.processor
 
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 
 import groovy.transform.PackageScope
@@ -326,9 +327,27 @@ class ProcessFactory {
         session.library.register(process)
     }
 
-    void importLibrary( path ) {
+    void importLibrary( def path ) {
         assert path
-        session.getScriptParser().parse(path as Path).run()
+        final module = resolveModulePath(path)
+        try {
+            session.getScriptParser().parse(module).run()
+        }
+        catch( NoSuchFileException e ) {
+            throw new IllegalArgumentException("Module file does not exists: $module")
+        }
+        catch( Exception e ) {
+            throw new IllegalArgumentException("Unable to load module file: $module", e)
+        }
+    }
+
+    private Path resolveModulePath(def path ) {
+        def result = path as Path
+        if( result.fileSystem != session.baseDir.fileSystem )
+            throw new IllegalArgumentException("Remote module files are not allowed: ${result.toUriString()}")
+        if( !result.isAbsolute() )
+            result = session.baseDir.resolve(result)
+        return result
     }
 
 }
