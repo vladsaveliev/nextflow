@@ -36,9 +36,11 @@ import org.apache.commons.lang.StringUtils
  */
 @Slf4j
 @CompileStatic
-class ScriptBinding extends Binding {
+class ScriptBinding extends Binding implements Cloneable {
 
     private Map config
+
+    boolean module
 
     /**
      * Creates a new nextflow script binding object
@@ -70,7 +72,6 @@ class ScriptBinding extends Binding {
         else
             [:]
     }
-
 
     /**
      * The map of the CLI named parameters

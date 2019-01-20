@@ -265,7 +265,7 @@ class ScriptRunner {
 
     protected BaseScript parseScript( String scriptText ) {
         log.debug "> Script parsing"
-        scriptObj = session.getScriptParser().parse(scriptText)
+        scriptObj = session.getScriptParser().parse(scriptText, session.binding)
         session.scriptClassName = scriptObj.class.simpleName
         return scriptObj
     }

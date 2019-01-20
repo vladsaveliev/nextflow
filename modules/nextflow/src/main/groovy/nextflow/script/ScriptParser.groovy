@@ -42,11 +42,8 @@ class ScriptParser {
 
     private Session session
 
-    private Binding binding
-
-    ScriptParser(Session session, Binding binding) {
+    ScriptParser(Session session) {
         this.session = session
-        this.binding = binding
     }
 
     @Memoized
@@ -85,11 +82,11 @@ class ScriptParser {
         return "_nf_script_${hash}"
     }
 
-    BaseScript parse(Path scriptPath) {
-        parse(scriptPath.text)
+    BaseScript parse(Path scriptPath, ScriptBinding binding) {
+        parse(scriptPath.text, binding)
     }
 
-    BaseScript parse(String scriptText) {
+    BaseScript parse(String scriptText, ScriptBinding binding) {
         def config = getCompilerConfig()
         def gcl = session.getClassLoader()
         def clazzName = computeClassName(scriptText)

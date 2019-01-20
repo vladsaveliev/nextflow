@@ -45,6 +45,15 @@ abstract class BaseScript extends Script {
 
     private ProcessFactory processFactory
 
+    @Override
+    ScriptBinding getBinding() {
+        return (ScriptBinding)super.getBinding()
+    }
+
+    private boolean isModule() {
+        getBinding().isModule()
+    }
+
     /**
      * The list of process defined in the pipeline script
      */
@@ -105,10 +114,7 @@ abstract class BaseScript extends Script {
      * @param body The body of the process declaration. It holds all the process definitions: inputs, outputs, code, etc.
      */
     protected process( Map<String,?> args, String name, Closure body ) {
-        // create the process
-        taskProcessor = processFactory.createProcessor(name, body, args)
-        // launch it
-        result = taskProcessor.run()
+        throw new DeprecationException("This process invocation syntax is deprecated")
     }
 
     /**
@@ -123,18 +129,18 @@ abstract class BaseScript extends Script {
      * @param body The body of the process declaration. It holds all the process definitions: inputs, outputs, code, etc.
      */
     protected process( String name, Closure body ) {
-        // create the process
-        taskProcessor = processFactory.createProcessor(name, body)
-        // launch it
-        result = taskProcessor.run()
+        if( isModule() ) {
+            processFactory.defineProcess(name,body)
+        }
+        else {
+            // create and launch the process
+            taskProcessor = processFactory.createProcessor(name, body)
+            result = taskProcessor.run()
+        }
     }
 
-    protected void processDef( String name, Closure body ) {
-        processFactory.defineProcess(name,body)
-    }
-
-    protected void importLibrary(path) {
-        processFactory.importLibrary(path)
+    protected void require(path) {
+        processFactory.require(path)
     }
 
 }

@@ -37,6 +37,7 @@ import nextflow.executor.SlurmExecutor
 import nextflow.executor.SupportedScriptTypes
 import nextflow.k8s.K8sExecutor
 import nextflow.script.BaseScript
+import nextflow.script.ScriptBinding
 import nextflow.script.ScriptType
 import nextflow.script.TaskBody
 import nextflow.util.ServiceDiscover
@@ -327,11 +328,13 @@ class ProcessFactory {
         session.library.register(process)
     }
 
-    void importLibrary( def path ) {
+    void require(def path) {
         assert path
         final module = resolveModulePath(path)
         try {
-            session.getScriptParser().parse(module).run()
+            def binding = (ScriptBinding)session.binding.clone()
+            binding.module = true
+            session.getScriptParser().parse(module,binding).run()
         }
         catch( NoSuchFileException e ) {
             throw new IllegalArgumentException("Module file does not exists: $module")

@@ -538,7 +538,7 @@ class Session implements ISession {
 
     @Memoized
     ScriptParser getScriptParser() {
-        new ScriptParser(this, binding)
+        new ScriptParser(this)
     }
 
     Barrier getBarrier() { monitorsBarrier }
