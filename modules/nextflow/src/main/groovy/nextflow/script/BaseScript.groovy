@@ -16,9 +16,11 @@
 
 package nextflow.script
 
-
+import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.Global
+import nextflow.Session
 import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
@@ -43,8 +45,6 @@ abstract class BaseScript extends Script {
         this.processNames = processNames
     }
 
-    private ProcessFactory processFactory
-
     @Override
     ScriptBinding getBinding() {
         return (ScriptBinding)super.getBinding()
@@ -59,10 +59,9 @@ abstract class BaseScript extends Script {
      */
     private List<String> processNames
 
-    @PackageScope
-    BaseScript setProcessFactory( ProcessFactory factory )  {
-        processFactory = factory
-        return this
+    @Memoized
+    private ProcessFactory getProcessFactory() {
+        new ProcessFactory(this, Global.session as Session)
     }
 
     @PackageScope
@@ -73,7 +72,7 @@ abstract class BaseScript extends Script {
      */
     Map getConfig() {
         log.warn "The access of `config` object is deprecated"
-        processFactory.getSession().getConfig()
+        getProcessFactory().getSession().getConfig()
     }
 
     @Lazy
@@ -130,17 +129,17 @@ abstract class BaseScript extends Script {
      */
     protected process( String name, Closure body ) {
         if( isModule() ) {
-            processFactory.defineProcess(name,body)
+            getProcessFactory().defineProcess(name,body)
         }
         else {
             // create and launch the process
-            taskProcessor = processFactory.createProcessor(name, body)
+            taskProcessor = getProcessFactory().createProcessor(name, body)
             result = taskProcessor.run()
         }
     }
 
     protected void require(path) {
-        processFactory.require(path)
+        getProcessFactory().require(path)
     }
 
 }

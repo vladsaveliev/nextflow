@@ -16,7 +16,6 @@
 
 package nextflow.script
 
-import java.nio.file.Path
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
@@ -147,7 +146,7 @@ class ScriptRunner {
         assert scriptText
 
         // init session
-        init(scriptFile?.main, args)
+        init(scriptFile, args)
 
         // start session
         session.start()
@@ -185,7 +184,7 @@ class ScriptRunner {
         assert methodName
 
         // init session
-        init(scriptFile.main, args)
+        init(scriptFile, args)
 
         parseScript(scriptText)
         def values = args ? args.collect { parseValue(it) } : null
@@ -241,19 +240,12 @@ class ScriptRunner {
         }
     }
 
-    protected ScriptRunner init(Path scriptPath, List<String> args = null) {
+    protected ScriptRunner init(ScriptFile scriptFile, List<String> args = null) {
 
-        session.init(scriptPath)
+        session.init(scriptFile)
 
         session.binding.setArgs( new ArgsList(args) )
         session.binding.setParams( (Map)session.config.params )
-        session.binding.setVariable( 'baseDir', session.baseDir )
-        session.binding.setVariable( 'workDir', session.workDir )
-        if( scriptFile ) {
-            def meta = new WorkflowMetadata(this)
-            session.binding.setVariable( 'workflow', meta )
-            session.binding.setVariable( 'nextflow', meta.nextflow )
-        }
 
         return this
     }

@@ -26,7 +26,6 @@ import nextflow.Nextflow
 import nextflow.Session
 import nextflow.ast.NextflowDSL
 import nextflow.ast.NextflowXform
-import nextflow.processor.ProcessFactory
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import org.apache.commons.lang.StringUtils
@@ -82,18 +81,32 @@ class ScriptParser {
         return "_nf_script_${hash}"
     }
 
+    protected void setupBinding(ScriptBinding binding) {
+        binding.setVariable( 'baseDir', session.baseDir )
+        binding.setVariable( 'workDir', session.workDir )
+        binding.setVariable( 'workflow', session.workflowMetadata )
+        binding.setVariable( 'nextflow', session.workflowMetadata.nextflow )
+    }
+
+    GroovyShell getInterpreter(ScriptBinding binding) {
+        setupBinding(binding)
+        final config = getCompilerConfig()
+        final gcl = session.getClassLoader()
+        return new GroovyShell(gcl, binding, config)
+    }
+
+    BaseScript parse(String scriptText, GroovyShell interpreter) {
+        final clazzName = computeClassName(scriptText)
+        return (BaseScript)interpreter.parse(scriptText, clazzName)
+    }
+
+    BaseScript parse(String scriptText, ScriptBinding binding) {
+        def interpreter = getInterpreter(binding)
+        parse(scriptText, interpreter)
+    }
+
     BaseScript parse(Path scriptPath, ScriptBinding binding) {
         parse(scriptPath.text, binding)
     }
 
-    BaseScript parse(String scriptText, ScriptBinding binding) {
-        def config = getCompilerConfig()
-        def gcl = session.getClassLoader()
-        def clazzName = computeClassName(scriptText)
-        def groovy = new GroovyShell(gcl, binding, config)
-        def script = groovy.parse(scriptText, clazzName) as BaseScript
-        // create the process factory
-        script.setProcessFactory(new ProcessFactory(script, session))
-        return script
-    }
 }

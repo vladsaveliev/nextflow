@@ -153,12 +153,11 @@ class NextflowDSLImpl implements ASTTransformation {
         void visitMethodCallExpression(MethodCallExpression methodCall) {
             // pre-condition to be verified to apply the transformation
             Boolean preCondition = methodCall.objectExpression?.getText() == 'this'
-            String name = methodCall.getMethodAsString()
 
             /*
              * intercept the *process* method in order to transform the script closure
              */
-            if( preCondition && (name=='process' || name=='processDef') ) {
+            if( preCondition &&  methodCall.getMethodAsString() == 'process' ) {
 
                 // clear block label
                 currentLabel = null

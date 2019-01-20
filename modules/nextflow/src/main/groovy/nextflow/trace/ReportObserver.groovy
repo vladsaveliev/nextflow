@@ -100,7 +100,7 @@ class ReportObserver implements TraceObserver {
      * @return The {@link WorkflowMetadata} object associated to this execution
      */
     protected WorkflowMetadata getWorkflowMetadata() {
-        session.binding.getVariable('workflow') as WorkflowMetadata
+        session.getWorkflowMetadata()
     }
 
     /**

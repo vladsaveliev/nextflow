@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.Session
 import nextflow.util.ReadOnlyMap
 import org.apache.commons.lang.StringUtils
 /**
@@ -38,9 +39,11 @@ import org.apache.commons.lang.StringUtils
 @CompileStatic
 class ScriptBinding extends Binding implements Cloneable {
 
-    private Map config
+    private Map configEnv
 
     boolean module
+
+    Session session
 
     /**
      * Creates a new nextflow script binding object
@@ -48,13 +51,9 @@ class ScriptBinding extends Binding implements Cloneable {
      * @param config Nextflow configuration object
      * @return A new {@link ScriptBinding} instance
      */
-    def ScriptBinding(Map config) {
+    ScriptBinding(Map config) {
         super( new ReadOnlyMap( [args:[], params: new ParamsMap() ]) )
-        this.config = config != null ? config : [:]
-    }
-
-    Map getConfig() {
-        return config
+        this.configEnv = config?.env instanceof Map ? (Map)config.env : Collections.emptyMap()
     }
 
     @Memoized
@@ -63,22 +62,11 @@ class ScriptBinding extends Binding implements Cloneable {
     }
 
     /**
-     * The fallback session environment
-     */
-    @Memoized
-    protected Map getConfigEnv() {
-        if( config.env instanceof Map )
-            return (Map)config.env
-        else
-            [:]
-    }
-
-    /**
      * The map of the CLI named parameters
      *
      * @param values
      */
-    def void setParams( Map<String,Object> values ) {
+    void setParams( Map<String,Object> values ) {
         if( !values )
             return
         def params = (ParamsMap)super.getVariable('params')
@@ -89,7 +77,7 @@ class ScriptBinding extends Binding implements Cloneable {
      * The list of CLI arguments (unnamed)
      * @param values
      */
-    def void setArgs( List<String> values ) {
+    void setArgs( List<String> values ) {
         (getVariables() as ReadOnlyMap).force( 'args', values  )
     }
 

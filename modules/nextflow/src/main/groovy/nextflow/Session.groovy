@@ -48,7 +48,9 @@ import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.script.ScriptBinding
+import nextflow.script.ScriptFile
 import nextflow.script.ScriptParser
+import nextflow.script.WorkflowMetadata
 import nextflow.trace.AnsiLogObserver
 import nextflow.trace.GraphObserver
 import nextflow.trace.ReportObserver
@@ -192,6 +194,8 @@ class Session implements ISession {
 
     private boolean statsEnabled
 
+    private WorkflowMetadata workflowMetadata
+
     private WorkflowStats workflowStats
 
     boolean getStatsEnabled() { statsEnabled }
@@ -210,6 +214,8 @@ class Session implements ISession {
 
     WorkflowStats getWorkflowStats() { workflowStats }
 
+    WorkflowMetadata getWorkflowMetadata() { workflowMetadata }
+
     Path getClassesDir() { classesDir }
 
     boolean ansiLog
@@ -222,26 +228,18 @@ class Session implements ISession {
      * Creates a new session with an 'empty' (default) configuration
      */
     Session() {
-        create(new ScriptBinding([:]))
+        create([:])
     }
 
-    /**
-     * Create a new session given the {@link ScriptBinding} object
-     *
-     * @param binding
-     */
-    Session(ScriptBinding binding) {
-        create(binding)
-    }
 
     /**
      * Create a new session given the configuration specified
      *
      * @param config
      */
-    Session(Map cfg) {
-        final config = cfg instanceof ConfigObject ? cfg.toMap() : cfg
-        create(new ScriptBinding(config))
+    Session(Map obj) {
+        final config = obj instanceof ConfigObject ? obj.toMap() : obj
+        create(config)
     }
 
     /**
@@ -266,11 +264,11 @@ class Session implements ISession {
      *
      * @param binding
      */
-    private void create( ScriptBinding binding ) {
-        assert binding != null
+    private void create( Map config ) {
+        assert config != null
 
-        this.binding = binding
-        this.config = binding.config
+        this.config = config
+        this.binding = new ScriptBinding(config)
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
 
@@ -318,7 +316,7 @@ class Session implements ISession {
     /**
      * Initialize the session workDir, libDir, baseDir and scriptName variables
      */
-    void init( Path scriptPath ) {
+    void init( ScriptFile scriptFile ) {
 
         this.workDir = ((config.workDir ?: 'work') as Path).complete()
         this.setLibDir( config.libDir as String )
@@ -331,11 +329,11 @@ class Session implements ISession {
             log.debug "Bucket-dir: ${bucketDir.toUriString()}"
         }
 
-        if( scriptPath ) {
+        if( scriptFile ) {
             // the folder that contains the main script
-            this.setBaseDir(scriptPath.parent)
+            this.setBaseDir(scriptFile.main.parent)
             // set the script name attribute
-            this.setScriptName(scriptPath.name)
+            this.setScriptName(scriptFile.main.name)
         }
 
         // set the byte-code target directory
@@ -343,6 +341,7 @@ class Session implements ISession {
         this.library = new ProcessLibrary(this)
         this.observers = createObservers()
         this.statsEnabled = observers.any { it.enableMetrics() }
+        this.workflowMetadata = new WorkflowMetadata(this, scriptFile)
 
         cache = new CacheDB(uniqueId,runName).open()
     }
