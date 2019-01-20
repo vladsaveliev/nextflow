@@ -82,6 +82,7 @@ class ScriptParser {
     }
 
     protected void setupBinding(ScriptBinding binding) {
+        binding.setSession(session)
         binding.setVariable( 'baseDir', session.baseDir )
         binding.setVariable( 'workDir', session.workDir )
         binding.setVariable( 'workflow', session.workflowMetadata )

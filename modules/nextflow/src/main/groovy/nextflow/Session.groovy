@@ -268,7 +268,7 @@ class Session implements ISession {
         assert config != null
 
         this.config = config
-        this.binding = new ScriptBinding(config)
+        this.binding = new ScriptBinding()
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
 

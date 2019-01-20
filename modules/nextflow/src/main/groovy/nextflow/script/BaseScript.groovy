@@ -19,8 +19,6 @@ package nextflow.script
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
-import nextflow.Global
-import nextflow.Session
 import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
@@ -61,7 +59,7 @@ abstract class BaseScript extends Script {
 
     @Memoized
     private ProcessFactory getProcessFactory() {
-        new ProcessFactory(this, Global.session as Session)
+        new ProcessFactory(this, binding.session)
     }
 
     @PackageScope

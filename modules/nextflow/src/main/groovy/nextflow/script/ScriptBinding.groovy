@@ -39,8 +39,6 @@ import org.apache.commons.lang.StringUtils
 @CompileStatic
 class ScriptBinding extends Binding implements Cloneable {
 
-    private Map configEnv
-
     boolean module
 
     Session session
@@ -51,14 +49,20 @@ class ScriptBinding extends Binding implements Cloneable {
      * @param config Nextflow configuration object
      * @return A new {@link ScriptBinding} instance
      */
-    ScriptBinding(Map config) {
+    ScriptBinding() {
         super( new ReadOnlyMap( [args:[], params: new ParamsMap() ]) )
-        this.configEnv = config?.env instanceof Map ? (Map)config.env : Collections.emptyMap()
     }
 
     @Memoized
     protected Map<String,String> getSysEnv() {
         new HashMap(System.getenv())
+    }
+
+    @Memoized
+    protected Map<String,String> getConfigEnv() {
+        if( !session )
+            throw new IllegalStateException("Undefined session object in ScriptBinding")
+        session.config?.env instanceof Map ? (Map)session.config.env : Collections.emptyMap()
     }
 
     /**
