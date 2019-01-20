@@ -137,7 +137,12 @@ abstract class BaseScript extends Script {
     }
 
     protected void require(path) {
-        getProcessFactory().require(path)
+        require(Collections.emptyMap(), path)
+    }
+
+    protected void require(Map opts, path) {
+        def params = opts.params ? (Map)opts.params : null
+        getProcessFactory().require(path, params)
     }
 
 }

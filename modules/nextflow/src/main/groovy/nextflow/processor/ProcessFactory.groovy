@@ -328,12 +328,12 @@ class ProcessFactory {
         session.library.register(process)
     }
 
-    void require(def path) {
+    void require(def path, Map params) {
         assert path
         final module = resolveModulePath(path)
         try {
-            def binding = (ScriptBinding)session.binding.clone()
-            binding.module = true
+            final binding = new ScriptBinding(module: true)
+            binding.setParams(params)
             session.getScriptParser().parse(module,binding).run()
         }
         catch( NoSuchFileException e ) {

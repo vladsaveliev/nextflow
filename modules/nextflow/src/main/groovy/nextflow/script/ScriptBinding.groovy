@@ -15,6 +15,7 @@
  */
 
 package nextflow.script
+
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
@@ -37,7 +38,7 @@ import org.apache.commons.lang.StringUtils
  */
 @Slf4j
 @CompileStatic
-class ScriptBinding extends Binding implements Cloneable {
+class ScriptBinding extends Binding {
 
     boolean module
 
@@ -123,6 +124,16 @@ class ScriptBinding extends Binding implements Cloneable {
         if( name == 'channel' )
             log.warn 'The use of the identifier `channel` as variable name is discouraged and will be deprecated in a future version'
         super.setVariable(name, value)
+    }
+
+    ScriptBinding setVariables(Map<String,Object> vars) {
+        if( vars ) for( Map.Entry<String,Object> entry : vars ) {
+            if( entry.key == 'params' && entry.value instanceof Map )
+                setParams((Map)entry.value)
+            else
+                setVariable(entry.key, entry.value)
+        }
+        return this
     }
 
     /**
