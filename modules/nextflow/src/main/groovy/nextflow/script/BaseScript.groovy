@@ -78,13 +78,17 @@ abstract class BaseScript extends Script {
 
     private TaskProcessor taskProcessor
 
-    /** Access to the last *process* object -- only for testing purpose */
+    /**
+     * Access to the last *process* object -- only for testing purpose
+     */
     @PackageScope
     TaskProcessor getTaskProcessor() { taskProcessor }
 
     private result
 
-    /** Access to the last *process* result -- only for testing purpose */
+    /**
+     * Access to the last *process* result -- only for testing purpose
+     */
     @PackageScope
     Object getResult() { result }
 
@@ -94,7 +98,8 @@ abstract class BaseScript extends Script {
      * @param value
      */
     void echo(boolean value = true) {
-        config.process.echo = value
+        log.warn "The use of `echo` method is deprecated"
+        getProcessFactory().getSession().getConfig().process.echo = value
     }
 
 

@@ -35,6 +35,7 @@ import nextflow.cli.CmdRun
 import nextflow.script.BaseScript
 import nextflow.config.ConfigBuilder
 import nextflow.script.ScriptBinding
+import nextflow.script.ScriptFile
 import nextflow.util.Duration
 import nextflow.util.LoggerHelper
 import nextflow.util.MemoryUnit
@@ -51,7 +52,7 @@ import org.codehaus.groovy.runtime.StackTraceUtils
 @Slf4j
 class Nextflow extends Console {
 
-    static final TITLE = 'Nextflow REPL console'
+    static public final TITLE = 'Nextflow REPL console'
 
     static {
 
@@ -78,21 +79,25 @@ class Nextflow extends Console {
 
     private ClassLoader loader
 
+    private Map scriptConfig
+
     Nextflow(ClassLoader loader) {
-        super(loader, createBinding())
+        super(loader, new ScriptBinding())
         this.loader = loader
+        this.scriptConfig = createScriptConfig()
     }
 
-    static protected Binding createBinding() {
+    protected Map createScriptConfig() {
+        final script = scriptFile as Path
+        final base = script ? script.parent : Paths.get('.')
 
         // create the config object
-        def config = new ConfigBuilder()
-                        .setOptions( new CliOptions() )
-                        .setBaseDir(Paths.get('.'))
-                        .setCmdRun( new CmdRun() )
-                        .build()
+        return new ConfigBuilder()
+                    .setOptions( new CliOptions() )
+                    .setBaseDir(base)
+                    .setCmdRun( new CmdRun() )
+                    .build()
 
-        return new ScriptBinding(config)
     }
 
 
@@ -126,6 +131,7 @@ class Nextflow extends Console {
     void newScript(ClassLoader parent, Binding binding) {
 
         config = createCompilerConfig()
+        scriptConfig = createScriptConfig()
 
         // from super 'newScript' implementation
         if (threadInterrupt) config.addCompilationCustomizers(new ASTTransformationCustomizer(ThreadInterrupt))
@@ -136,7 +142,7 @@ class Nextflow extends Console {
 
     @Override
     void clearContext(EventObject evt = null) {
-        def binding = createBinding()
+        final binding = new ScriptBinding()
         newScript(null, binding)
         // reload output transforms
         binding.variables._outputTransforms = OutputTransforms.loadOutputTransforms()
@@ -154,12 +160,15 @@ class Nextflow extends Console {
 
     private runWith( Closure launcher ) {
 
-        def binding = shell.context as ScriptBinding
-        def session = new Session(binding)
-        session.init(scriptFile as Path)
+        def script = scriptFile ? new ScriptFile((File)scriptFile) : null
+        def binding = (ScriptBinding)shell.context
+        def session = new Session(scriptConfig).init(script)
 
+        binding.setSession(session)
         binding.setVariable( 'baseDir', session.baseDir )
         binding.setVariable( 'workDir', session.workDir )
+        binding.setVariable( 'workflow', session.workflowMetadata )
+        binding.setVariable( 'nextflow', session.workflowMetadata.nextflow )
 
         beforeExecution = { session.start() }
         afterExecution = { session.await(); session.destroy() }

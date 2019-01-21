@@ -26,6 +26,7 @@ import java.util.concurrent.Executors
 
 import com.google.common.hash.HashCode
 import com.upplication.s3fs.S3OutputStream
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
@@ -50,6 +51,7 @@ import nextflow.processor.TaskProcessor
 import nextflow.script.ScriptBinding
 import nextflow.script.ScriptFile
 import nextflow.script.ScriptParser
+import nextflow.script.ScriptRunner
 import nextflow.script.WorkflowMetadata
 import nextflow.trace.AnsiLogObserver
 import nextflow.trace.GraphObserver
@@ -147,6 +149,10 @@ class Session implements ISession {
      * List files that concurrent on the session configuration
      */
     List<Path> configFiles
+
+    String profile
+
+    String commandLine
 
     /**
      * Local path where script generated classes are saved
@@ -268,7 +274,6 @@ class Session implements ISession {
         assert config != null
 
         this.config = config
-        this.binding = new ScriptBinding()
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
 
@@ -316,7 +321,12 @@ class Session implements ISession {
     /**
      * Initialize the session workDir, libDir, baseDir and scriptName variables
      */
-    void init( ScriptFile scriptFile ) {
+    Session init( ScriptFile scriptFile, List<String> args=null ) {
+
+        // configure script params
+        binding = new ScriptBinding()
+        binding.setParams( (Map)config.params )
+        binding.setArgs( new ScriptRunner.ArgsList(args) )
 
         this.workDir = ((config.workDir ?: 'work') as Path).complete()
         this.setLibDir( config.libDir as String )
@@ -344,6 +354,13 @@ class Session implements ISession {
         this.workflowMetadata = new WorkflowMetadata(this, scriptFile)
 
         cache = new CacheDB(uniqueId,runName).open()
+
+        return this
+    }
+
+    Session setBinding( ScriptBinding binding ) {
+        this.binding = binding
+        return this
     }
 
     ProcessLibrary getLibrary() { library }
@@ -1103,6 +1120,61 @@ class Session implements ISession {
     protected Map<String,String> getSystemEnv() {
         new HashMap<String, String>(System.getenv())
     }
+
+
+    @CompileDynamic
+    def getConfigContainers() {
+
+        def result = [:]
+        if( config.process instanceof Map<String,?> ) {
+
+            /*
+             * look for `container` definition at process level
+             */
+            config.process.each { String name, value ->
+                if( name.startsWith('$') && value instanceof Map && value.container ) {
+                    result[name] = resolveClosure(value.container)
+                }
+            }
+
+            /*
+             * default container definition
+             */
+            def container = config.process.container
+            if( container ) {
+                if( result ) {
+                    result['default'] = resolveClosure(container)
+                }
+                else {
+                    result = resolveClosure(container)
+                }
+            }
+
+        }
+
+        return result
+    }
+
+    /**
+     * Resolve dynamically defined attributes to the actual value
+     *
+     * @param val A process container definition either a plain string or a closure
+     * @return The actual container value
+     */
+    protected String resolveClosure( val ) {
+        if( val instanceof Closure ) {
+            try {
+                return val.cloneWith(binding).call()
+            }
+            catch( Exception e ) {
+                log.debug "Unable to resolve dynamic `container` directive -- cause: ${e.message ?: e}"
+                return "(dynamic resolved)"
+            }
+        }
+
+        return String.valueOf(val)
+    }
+
 
     /**
      * Defines the number of tasks the executor will handle in a parallel manner

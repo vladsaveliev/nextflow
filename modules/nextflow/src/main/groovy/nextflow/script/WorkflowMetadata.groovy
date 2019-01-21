@@ -213,12 +213,12 @@ class WorkflowMetadata {
         this.revision = scriptFile?.revision
         this.projectDir = scriptFile?.localPath
         this.start = new Date()
-        this.container = null //FIXME session.fetchContainers()
-        this.commandLine = null //FIXME session.commandLine
+        this.container = session.getConfigContainers()
+        this.commandLine = session.commandLine
         this.nextflow = [version: new VersionNumber(Const.APP_VER), build: Const.APP_BUILDNUM, timestamp: Const.APP_TIMESTAMP_UTC]
         this.workDir = session.workDir
         this.launchDir = Paths.get('.').complete()
-        this.profile = /*FIXME session.profile ?: */ ConfigBuilder.DEFAULT_PROFILE
+        this.profile = session.profile ?:  ConfigBuilder.DEFAULT_PROFILE
         this.sessionId = session.uniqueId
         this.resume = session.resumeMode
         this.runName = session.runName

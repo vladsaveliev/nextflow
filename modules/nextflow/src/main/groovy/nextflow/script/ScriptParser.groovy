@@ -46,7 +46,7 @@ class ScriptParser {
     }
 
     @Memoized
-    protected CompilerConfiguration getCompilerConfig() {
+    CompilerConfiguration getCompilerConfig() {
         // define the imports
         def importCustomizer = new ImportCustomizer()
         importCustomizer.addImports( StringUtils.name, groovy.transform.Field.name )

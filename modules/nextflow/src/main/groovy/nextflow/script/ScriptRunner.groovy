@@ -17,7 +17,6 @@
 package nextflow.script
 
 
-import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
@@ -81,11 +80,6 @@ class ScriptRunner {
     private CompilerConfiguration compilerConfig
 
     /**
-     * The used configuration profile
-     */
-    String profile
-
-    /**
      * Instantiate the runner object creating a new session
      */
     ScriptRunner( ) {
@@ -146,7 +140,7 @@ class ScriptRunner {
         assert scriptText
 
         // init session
-        init(scriptFile, args)
+        session.init(scriptFile, args)
 
         // start session
         session.start()
@@ -184,7 +178,7 @@ class ScriptRunner {
         assert methodName
 
         // init session
-        init(scriptFile, args)
+        session.init(scriptFile, args)
 
         parseScript(scriptText)
         def values = args ? args.collect { parseValue(it) } : null
@@ -240,12 +234,8 @@ class ScriptRunner {
         }
     }
 
+    @Deprecated
     protected ScriptRunner init(ScriptFile scriptFile, List<String> args = null) {
-
-        session.init(scriptFile)
-
-        session.binding.setArgs( new ArgsList(args) )
-        session.binding.setParams( (Map)session.config.params )
 
         return this
     }
@@ -336,71 +326,13 @@ class ScriptRunner {
             throw new AbortOperationException("Can't find a run with the specified id: ${session.uniqueId} -- Execution can't be resumed")
         }
 
-        commandLine = cli
         def revisionId = scriptFile.commitId ?: scriptFile.scriptId
-        HistoryFile.DEFAULT.write( name, session.uniqueId, revisionId, commandLine )
+        HistoryFile.DEFAULT.write( name, session.uniqueId, revisionId, cli )
     }
 
 
     @PackageScope
     ScriptFile getScriptFile() { scriptFile }
-
-    @PackageScope
-    String getCommandLine() { commandLine }
-
-    @PackageScope
-    @CompileDynamic
-    def fetchContainers() {
-
-        def result = [:]
-        if( session.config.process instanceof Map<String,?> ) {
-
-            /*
-             * look for `container` definition at process level
-             */
-            session.config.process.each { String name, value ->
-                if( name.startsWith('$') && value instanceof Map && value.container ) {
-                    result[name] = resolveClosure(value.container)
-                }
-            }
-
-            /*
-             * default container definition
-             */
-            def container = session.config.process.container
-            if( container ) {
-                if( result ) {
-                    result['default'] = resolveClosure(container)
-                }
-                else {
-                    result = resolveClosure(container)
-                }
-            }
-
-        }
-
-        return result
-    }
-
-    /**
-     * Resolve dynamically defined attributes to the actual value
-     *
-     * @param val A process container definition either a plain string or a closure
-     * @return The actual container value
-     */
-    protected String resolveClosure( val ) {
-        if( val instanceof Closure ) {
-            try {
-                return val.cloneWith(session.binding).call()
-            }
-            catch( Exception e ) {
-                log.debug "Unable to resolve dynamic `container` directive -- cause: ${e.message ?: e}"
-                return "(dynamic resolved)"
-            }
-        }
-
-        return String.valueOf(val)
-    }
 
     /**
      * Extends an {@code ArrayList} class adding a nicer index-out-of-range error message
