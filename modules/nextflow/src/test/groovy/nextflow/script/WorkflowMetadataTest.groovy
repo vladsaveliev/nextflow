@@ -16,6 +16,8 @@
 
 package nextflow.script
 
+import spock.lang.Specification
+
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -26,8 +28,6 @@ import nextflow.trace.TraceRecord
 import nextflow.util.Duration
 import nextflow.util.VersionNumber
 import org.eclipse.jgit.api.Git
-import spock.lang.Specification
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -72,21 +72,17 @@ class WorkflowMetadataTest extends Specification {
          * config file onComplete handler
          */
         def handlerInvoked
-        def session = new Session([workflow: [onComplete: { -> handlerInvoked=workflow.commandLine } ],
-                                   docker:[enabled:true],
-                                   manifest: [version: '1.0.0', nextflowVersion: '>=0.31.1']])
-        session.configFiles = [Paths.get('foo'), Paths.get('bar')]
-        /*
-         * script runner
-         */
-        def runner = Mock(ScriptRunner)
-        runner.getScriptFile() >> script
-        runner.fetchContainers() >> 'busybox/latest'
-        runner.commandLine >> 'nextflow run -this -that'
-        runner.session >> session
+        def config = [workflow: [onComplete: { -> handlerInvoked=workflow.commandLine } ],
+                    docker:[enabled:true],
+                    manifest: [version: '1.0.0', nextflowVersion: '>=0.31.1']]
+        Session session = Spy(Session, constructorArgs: [config])
+        session.configFiles >> [Paths.get('foo'), Paths.get('bar')]
+
+        session.fetchContainers() >> 'busybox/latest'
+        session.commandLine >> 'nextflow run -this -that'
 
         when:
-        def metadata = new WorkflowMetadata(runner)
+        def metadata = new WorkflowMetadata(session, script)
         session.binding.setVariable('workflow',metadata)
         then:
         metadata.scriptId == '0e44b16bdeb8ef9f4d8aadcf520e717d'
@@ -125,8 +121,8 @@ class WorkflowMetadataTest extends Specification {
 
 
         when:
-        runner.profile >> 'foo_profile'
-        metadata = new WorkflowMetadata(runner)
+        session.profile >> 'foo_profile'
+        metadata = new WorkflowMetadata(session, script)
         then:
         metadata.profile == 'foo_profile'
 
@@ -145,16 +141,12 @@ class WorkflowMetadataTest extends Specification {
         dir.resolve('main.nf').text = "println 'Hello world'"
         def script = new ScriptFile(dir.resolve('main.nf').toFile())
 
-        def session = new Session()
-
-        def runner = Mock(ScriptRunner)
-        runner.getScriptFile() >> script
-        runner.fetchContainers() >> 'busybox/latest'
-        runner.commandLine >> 'nextflow run -this -that'
-        runner.session >> session
+        def session = Spy(Session)
+        session.fetchContainers() >> 'busybox/latest'
+        session.commandLine >> 'nextflow run -this -that'
 
         when:
-        def metadata = new WorkflowMetadata(runner)
+        def metadata = new WorkflowMetadata(session, script)
         session.binding.setVariable('value_a', 1)
         session.binding.setVariable('value_b', 2)
         session.binding.setVariable('workflow', metadata)
@@ -197,16 +189,13 @@ class WorkflowMetadataTest extends Specification {
         dir.resolve('main.nf').text = "println 'Hello world'"
         def script = new ScriptFile(dir.resolve('main.nf').toFile())
 
-        def session = new Session()
-
-        def runner = Mock(ScriptRunner)
-        runner.getScriptFile() >> script
-        runner.fetchContainers() >> 'busybox/latest'
-        runner.commandLine >> 'nextflow run -this -that'
-        runner.session >> session
+        def session = Spy(Session)
+        //session.containerConfig >> new ContainerConfig()
+        session.fetchContainers() >> 'busybox/latest'
+        session.commandLine >> 'nextflow run -this -that'
 
         when:
-        def metadata = new WorkflowMetadata(runner)
+        def metadata = new WorkflowMetadata(session, script)
         session.binding.setVariable('value_a', 1)
         session.binding.setVariable('value_b', 2)
         session.binding.setVariable('workflow', metadata)

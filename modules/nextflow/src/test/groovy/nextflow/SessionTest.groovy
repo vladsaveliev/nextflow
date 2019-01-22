@@ -20,6 +20,7 @@ import java.nio.file.Paths
 import java.nio.file.attribute.PosixFilePermission
 
 import nextflow.container.ContainerConfig
+import nextflow.script.ScriptFile
 import nextflow.trace.StatsObserver
 import nextflow.trace.TraceFileObserver
 import nextflow.util.Duration
@@ -277,15 +278,26 @@ class SessionTest extends Specification {
 
         given:
         def folder = TestHelper.createInMemTempDir()
-        def script = folder.resolve('pipeline.nf')
+        def file = folder.resolve('pipeline.nf'); file.text = 'println "hello"'
+        def script = new ScriptFile(file)
 
         when:
         def session = new Session([workDir: '../work'])
         session.init(script)
+
         then:
+        session.binding != null 
         session.baseDir == folder
         session.workDir.isAbsolute()
         !session.workDir.toString().contains('..')
+        session.scriptName == 'pipeline.nf'
+        session.classesDir.exists()
+        session.library != null
+        session.observers != null
+        session.workflowMetadata != null
+        
+        cleanup:
+        session.classesDir?.deleteDir()
 
     }
 

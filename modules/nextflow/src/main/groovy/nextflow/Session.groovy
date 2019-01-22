@@ -274,6 +274,7 @@ class Session implements ISession {
         assert config != null
 
         this.config = config
+        this.binding = new ScriptBinding()
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
 
@@ -323,11 +324,6 @@ class Session implements ISession {
      */
     Session init( ScriptFile scriptFile, List<String> args=null ) {
 
-        // configure script params
-        binding = new ScriptBinding()
-        binding.setParams( (Map)config.params )
-        binding.setArgs( new ScriptRunner.ArgsList(args) )
-
         this.workDir = ((config.workDir ?: 'work') as Path).complete()
         this.setLibDir( config.libDir as String )
 
@@ -353,6 +349,10 @@ class Session implements ISession {
         this.statsEnabled = observers.any { it.enableMetrics() }
         this.workflowMetadata = new WorkflowMetadata(this, scriptFile)
 
+        // configure script params
+        binding.setParams( (Map)config.params )
+        binding.setArgs( new ScriptRunner.ArgsList(args) )
+        
         cache = new CacheDB(uniqueId,runName).open()
 
         return this
@@ -1123,7 +1123,7 @@ class Session implements ISession {
 
 
     @CompileDynamic
-    def getConfigContainers() {
+    def fetchContainers() {
 
         def result = [:]
         if( config.process instanceof Map<String,?> ) {
