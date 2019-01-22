@@ -19,81 +19,40 @@ package nextflow.processor
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 
-import groovy.transform.PackageScope
+import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.Session
-import nextflow.cloud.aws.batch.AwsBatchExecutor
-import nextflow.executor.CondorExecutor
-import nextflow.executor.CrgExecutor
 import nextflow.executor.Executor
-import nextflow.executor.LocalExecutor
-import nextflow.executor.LsfExecutor
-import nextflow.executor.NopeExecutor
-import nextflow.executor.NqsiiExecutor
-import nextflow.executor.PbsExecutor
-import nextflow.executor.PbsProExecutor
-import nextflow.executor.SgeExecutor
-import nextflow.executor.SlurmExecutor
-import nextflow.executor.SupportedScriptTypes
-import nextflow.k8s.K8sExecutor
+import nextflow.executor.ExecutorFactory
 import nextflow.script.BaseScript
 import nextflow.script.ScriptBinding
-import nextflow.script.ScriptType
 import nextflow.script.TaskBody
-import nextflow.util.ServiceDiscover
-import nextflow.util.ServiceName
+
 /**
  *  Factory class for {@TaskProcessor} instances
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
+@CompileStatic
 class ProcessFactory {
 
-    static public String DEFAULT_EXECUTOR = System.getenv('NXF_EXECUTOR') ?: 'local'
+    private Session session
 
-    /*
-     * Map the executor class to its 'friendly' name
-     */
-    final protected Map executorsMap = [
-            'nope': NopeExecutor,
-            'local': LocalExecutor,
-            'sge':  SgeExecutor,
-            'oge':  SgeExecutor,
-            'uge':  SgeExecutor,
-            'lsf': LsfExecutor,
-            'pbs': PbsExecutor,
-            'pbspro': PbsProExecutor,
-            'slurm': SlurmExecutor,
-            'crg': CrgExecutor,
-            'bsc': LsfExecutor,
-            'condor': CondorExecutor,
-            'k8s': K8sExecutor,
-            'nqsii': NqsiiExecutor,
-            'awsbatch': AwsBatchExecutor
-    ]
-
-    private final Session session
-
-    private final Map config
+    private Map config
 
     private BaseScript owner
 
+    private ExecutorFactory executorFactory
+
     /* only for test -- do not use */
-    protected ProcessFactory() {
+    protected ProcessFactory() { }
 
-    }
-
-    ProcessFactory( BaseScript ownerScript, Session session, Map config = null ) {
+    ProcessFactory( BaseScript ownerScript, Session session ) {
         this.owner = ownerScript
         this.session = session
-        this.config = config != null ? config : session.config
-
-        // discover non-core executors
-        for( Class<Executor> clazz : ServiceDiscover.load(Executor) ) {
-            log.trace "Discovered executor class: ${clazz.name}"
-            executorsMap.put(findNameByClass(clazz), clazz)
-        }
+        this.config = session.config
+        this.executorFactory = session.executorFactory
     }
 
     Session getSession() { session }
@@ -111,74 +70,6 @@ class ProcessFactory {
      */
     protected TaskProcessor newTaskProcessor( String name, Executor executor, ProcessConfig config, TaskBody taskBody ) {
         new TaskProcessor(name, executor, session, owner, config, taskBody)
-    }
-
-    /**
-     * Extract the executor name by using the annotation {@code ServiceName} or fallback to simple classname
-     * if the annotation is not provided
-     *
-     * @param clazz
-     * @return
-     */
-    static String findNameByClass( Class<Executor> clazz ) {
-        def annotation = clazz.getAnnotation(ServiceName)
-        if( annotation )
-            return annotation.value()
-
-        def name = clazz.getSimpleName().toLowerCase()
-        if( name.endsWith('executor') ) {
-            name = name.subSequence(0, name.size()-'executor'.length())
-        }
-
-        return name
-    }
-
-    protected Class<? extends Executor> loadExecutorClass(String executorName) {
-        log.debug ">> processorType: '$executorName'"
-        if( !executorName )
-            return LocalExecutor
-
-        def clazz =  executorsMap[executorName.toLowerCase()]
-        if( !clazz )
-            throw new IllegalArgumentException("Unknown executor name: $executorName")
-
-        if( clazz instanceof Class )
-            return clazz
-
-        if( !(clazz instanceof String ) )
-            throw new IllegalArgumentException("Not a valid executor class object: $clazz")
-
-        // if the className is empty (because the 'processorType' does not map to any class, fallback to the 'processorType' itself)
-        if( !clazz ) {
-            clazz = executorName
-        }
-
-        log.debug "Loading executor class: ${clazz}"
-        try {
-            Thread.currentThread().getContextClassLoader().loadClass(clazz as String) as Class<Executor>
-        }
-        catch( Exception e ) {
-            throw new IllegalArgumentException("Cannot find a valid class for specified executor: '${executorName}'")
-        }
-
-    }
-
-
-    protected boolean isTypeSupported( ScriptType type, executor ) {
-
-        if( executor instanceof Executor ) {
-            executor = executor.class
-        }
-
-        if( executor instanceof Class ) {
-            def annotation = executor.getAnnotation(SupportedScriptTypes)
-            if( !annotation )
-                throw new IllegalArgumentException("Specified argument is not a valid executor class: $executor -- Missing 'SupportedScriptTypes' annotation")
-
-            return type in annotation.value()
-        }
-
-        throw new IllegalArgumentException("Specified argument is not a valid executor class: $executor")
     }
 
     /**
@@ -231,7 +122,7 @@ class ProcessFactory {
         applyConfig(name, processConfig, legacySettings)
 
         // -- get the executor for the given process config
-        final execObj = createExecutor(name, processConfig, script)
+        final execObj = executorFactory.createExecutor(name, processConfig, script, session)
 
         // -- create processor class
         newTaskProcessor( name, execObj, processConfig, script )
@@ -262,48 +153,6 @@ class ProcessFactory {
             log.warn("Directives `scratch` and `stageInMode=rellink` conflict each other -- Enforcing default stageInMode for process `$name`")
             processConfig.remove('stageInMode')
         }
-    }
-
-    @PackageScope
-    Executor createExecutor( String name, ProcessConfig processConfig, TaskBody script ) {
-        // -- load the executor to be used
-        def execName = getExecutorName(processConfig) ?: DEFAULT_EXECUTOR
-        def execClass = loadExecutorClass(execName)
-
-        if( !isTypeSupported(script.type, execClass) ) {
-            log.warn "Process '$name' cannot be executed by '$execName' executor -- Using 'local' executor instead"
-            execName = 'local'
-            execClass = LocalExecutor.class
-        }
-
-        def execObj = execClass.newInstance()
-        // -- inject the task configuration into the executor instance
-        execObj.session = session
-        execObj.name = execName
-        execObj.init()
-        return execObj
-    }
-
-    /**
-     * Find out the 'executor' to be used in the process definition or in teh session configuration object
-     *
-     * @param taskConfig
-     */
-    private getExecutorName(ProcessConfig taskConfig) {
-        // create the processor object
-        def result = taskConfig.executor?.toString()
-
-        if( !result ) {
-            if( session.config.executor instanceof String ) {
-                result = session.config.executor
-            }
-            else if( session.config.executor?.name instanceof String ) {
-                result = session.config.executor.name
-            }
-        }
-
-        log.debug "<< taskConfig executor: $result"
-        return result
     }
 
     void defineProcess(String name, Closure body) {

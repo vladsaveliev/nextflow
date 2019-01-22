@@ -40,14 +40,17 @@ import nextflow.exception.AbortOperationException
 import nextflow.exception.AbortSignalException
 import nextflow.exception.IllegalConfigException
 import nextflow.exception.MissingLibraryException
+import nextflow.executor.ExecutorFactory
 import nextflow.file.FileHelper
 import nextflow.processor.ErrorStrategy
 import nextflow.processor.ProcessConfig
+import nextflow.processor.ProcessFactory
 import nextflow.processor.ProcessLibrary
 import nextflow.processor.TaskDispatcher
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
+import nextflow.script.BaseScript
 import nextflow.script.ScriptBinding
 import nextflow.script.ScriptFile
 import nextflow.script.ScriptParser
@@ -89,6 +92,11 @@ class Session implements ISession {
      * Keep process definitions included as external modules
      */
     ProcessLibrary library
+
+    /**
+     * Creates process executors
+     */
+    ExecutorFactory executorFactory
 
     /**
      * Dispatch tasks for executions
@@ -345,6 +353,7 @@ class Session implements ISession {
         // set the byte-code target directory
         this.classesDir = FileHelper.createLocalDir()
         this.library = new ProcessLibrary(this)
+        this.executorFactory = new ExecutorFactory()
         this.observers = createObservers()
         this.statsEnabled = observers.any { it.enableMetrics() }
         this.workflowMetadata = new WorkflowMetadata(this, scriptFile)
@@ -363,7 +372,13 @@ class Session implements ISession {
         return this
     }
 
-    ProcessLibrary getLibrary() { library }
+    ProcessLibrary getLibrary() {
+        library
+    }
+
+    ProcessFactory newProcessFactory(BaseScript script) {
+        new ProcessFactory(script, this)
+    }
 
     /**
      * Given the `run` command line options creates the required {@link TraceObserver}s

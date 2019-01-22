@@ -16,9 +16,10 @@
 
 package nextflow.script
 
-import groovy.transform.Memoized
+
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.Session
 import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
@@ -29,10 +30,23 @@ import nextflow.processor.TaskProcessor
 @Slf4j
 abstract class BaseScript extends Script {
 
-    protected BaseScript() { }
+    /**
+     * The list of process defined in the pipeline script
+     */
+    private List<String> processNames
+
+    private TaskProcessor taskProcessor
+
+    @Lazy InputStream stdin = { System.in }()
+
+    private Session session
+
+    private ProcessFactory processFactory
 
     protected BaseScript(Binding binding) {
         super(binding)
+        this.session = getBinding().session
+        this.processFactory = session.newProcessFactory(this)
     }
 
     /**
@@ -52,16 +66,6 @@ abstract class BaseScript extends Script {
         getBinding().isModule()
     }
 
-    /**
-     * The list of process defined in the pipeline script
-     */
-    private List<String> processNames
-
-    @Memoized
-    private ProcessFactory getProcessFactory() {
-        new ProcessFactory(this, binding.session)
-    }
-
     @PackageScope
     List<String> getProcessNames() { processNames }
 
@@ -70,13 +74,9 @@ abstract class BaseScript extends Script {
      */
     Map getConfig() {
         log.warn "The access of `config` object is deprecated"
-        getProcessFactory().getSession().getConfig()
+        session.getConfig()
     }
 
-    @Lazy
-    InputStream stdin = { System.in }()
-
-    private TaskProcessor taskProcessor
 
     /**
      * Access to the last *process* object -- only for testing purpose
@@ -99,7 +99,7 @@ abstract class BaseScript extends Script {
      */
     void echo(boolean value = true) {
         log.warn "The use of `echo` method is deprecated"
-        getProcessFactory().getSession().getConfig().process.echo = value
+        session.getConfig().process.echo = value
     }
 
 
@@ -132,11 +132,11 @@ abstract class BaseScript extends Script {
      */
     protected process( String name, Closure body ) {
         if( isModule() ) {
-            getProcessFactory().defineProcess(name,body)
+            processFactory.defineProcess(name,body)
         }
         else {
             // create and launch the process
-            taskProcessor = getProcessFactory().createProcessor(name, body)
+            taskProcessor = processFactory.createProcessor(name, body)
             result = taskProcessor.run()
         }
     }
@@ -147,7 +147,7 @@ abstract class BaseScript extends Script {
 
     protected void require(Map opts, path) {
         def params = opts.params ? (Map)opts.params : null
-        getProcessFactory().require(path, params)
+        processFactory.require(path, params)
     }
 
 }
