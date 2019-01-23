@@ -47,6 +47,8 @@ class ScriptBinding extends Binding {
 
     private ParamsMap params
 
+    private Map configEnv = Collections.emptyMap()
+
     /**
      * Creates a new nextflow script binding object
      *
@@ -82,13 +84,6 @@ class ScriptBinding extends Binding {
         new HashMap(System.getenv())
     }
 
-    @Memoized
-    protected Map<String,String> getConfigEnv() {
-        if( !session )
-            throw new IllegalStateException("Undefined session object in ScriptBinding")
-        session.config?.env instanceof Map ? (Map)session.config.env : Collections.emptyMap()
-    }
-
     /**
      * The map of the CLI named parameters
      *
@@ -102,6 +97,7 @@ class ScriptBinding extends Binding {
 
     ScriptBinding setSession( Session session ) {
         this.session = session
+        this.configEnv = session.config?.env instanceof Map ? new HashMap<>((Map)session.config.env) : Collections.emptyMap()
         return this
     }
 

@@ -36,6 +36,8 @@ abstract class BaseScript extends Script {
 
     private TaskProcessor taskProcessor
 
+    private boolean module
+
     /**
      * The list of process defined in the pipeline script
      */
@@ -46,9 +48,9 @@ abstract class BaseScript extends Script {
     /** only for testing purpose */
     private result
 
-    protected BaseScript() { }
+    BaseScript() { }
 
-    protected BaseScript(Binding binding) {
+    BaseScript(Binding binding) {
         super(binding)
     }
 
@@ -58,17 +60,10 @@ abstract class BaseScript extends Script {
      */
     protected void init( List<String> processNames ) {
         this.processNames = processNames
-        this.session = getBinding().session
-        this.processFactory = session.newProcessFactory(this)
-    }
-
-    @Override
-    ScriptBinding getBinding() {
-        return (ScriptBinding)super.getBinding()
-    }
-
-    private boolean isModule() {
-        getBinding().isModule()
+        final binding = (ScriptBinding)getBinding()
+        this.session = binding.session
+        this.module = binding.module
+        this.processFactory = session?.newProcessFactory(this)
     }
 
     @PackageScope
@@ -133,7 +128,8 @@ abstract class BaseScript extends Script {
      * @param body The body of the process declaration. It holds all the process definitions: inputs, outputs, code, etc.
      */
     protected process( String name, Closure body ) {
-        if( isModule() ) {
+
+        if( module ) {
             processFactory.defineProcess(name,body)
         }
         else {
