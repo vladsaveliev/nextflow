@@ -73,20 +73,20 @@ class ProcessDef extends Closure {
 
     @Override
     Object call(final Object arg) {
-        run(arg)
+        call0(arg)
     }
 
     @Override
     Object call(final Object... args) {
-        run(args)
+        call0(args)
     }
 
     @Override
     Object call() {
-        run()
+        call0()
     }
 
-    protected run(Object... args) {
+    private call0(Object... args) {
         // sanity check
         if( args.size() != inputs.size() )
             throw new IllegalArgumentException("Process `$name` declares ${inputs.size()} input channels but ${args.size()} were specified")

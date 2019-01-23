@@ -179,7 +179,45 @@ class BaseScriptTest extends Specification {
         result instanceof DataflowReadChannel
         result.val == 'echo Ciao world'
 
+        cleanup:
+        folder?.deleteDir()
     }
 
+
+    def 'should inject params in module' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        params.foo = 'x' 
+        params.bar = 'y'
+        
+        process foo {
+          output: stdout() 
+          script:
+          /echo $params.foo $params.bar/
+        }
+        '''
+
+        // inject params in the module
+        // and invoke the process 'foo'
+        SCRIPT.text = """ 
+        require "$MODULE", params:[foo:'Hello', bar: 'world']
+        foo()
+        """
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo Hello world'
+
+        cleanup:
+        folder?.deleteDir()
+    }
 
 }

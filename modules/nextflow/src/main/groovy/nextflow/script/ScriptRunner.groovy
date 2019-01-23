@@ -28,7 +28,6 @@ import nextflow.exception.AbortOperationException
 import nextflow.exception.AbortRunException
 import nextflow.util.HistoryFile
 import nextflow.util.VersionNumber
-import org.codehaus.groovy.control.CompilerConfiguration
 import static nextflow.util.ConfigHelper.parseValue
 /**
  * Application main class
@@ -68,17 +67,6 @@ class ScriptRunner {
      * The script result
      */
     private def result
-
-    /**
-     * The launcher command line
-     */
-    private String commandLine
-
-    /**
-     * Groovy compiler config object used to parse the nextflow script
-     */
-    @Deprecated
-    private CompilerConfiguration compilerConfig
 
     /**
      * Instantiate the runner object creating a new session
