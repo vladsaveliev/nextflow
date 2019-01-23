@@ -18,12 +18,15 @@ package nextflow.executor
 
 import spock.lang.Specification
 
+import nextflow.Session
 import nextflow.cloud.aws.batch.AwsBatchExecutor
 import nextflow.k8s.K8sExecutor
+import nextflow.processor.ProcessConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
 import nextflow.processor.TaskRun
 import nextflow.script.ScriptType
+import nextflow.script.TaskBody
 import nextflow.util.ServiceName
 /**
  *
@@ -38,34 +41,59 @@ class ExecutorFactoryTest extends Specification {
         def factory = new ExecutorFactory()
         factory.executorsMap [ 'x' ] = XExecutor.name   // // <-- this is loaded by the name
         expect:
-        factory.loadExecutorClass(null) == LocalExecutor
-        factory.loadExecutorClass('local') == LocalExecutor
-        factory.loadExecutorClass('sge') == SgeExecutor
-        factory.loadExecutorClass('oge') == SgeExecutor
-        factory.loadExecutorClass('uge') == SgeExecutor
-        factory.loadExecutorClass('lsf') == LsfExecutor
-        factory.loadExecutorClass('pbs') == PbsExecutor
-        factory.loadExecutorClass('slurm') == SlurmExecutor
-        factory.loadExecutorClass('condor') == CondorExecutor
-        factory.loadExecutorClass('k8s') == K8sExecutor
-        factory.loadExecutorClass('awsbatch') == AwsBatchExecutor
-        factory.loadExecutorClass('AwsBatch') == AwsBatchExecutor
-        factory.loadExecutorClass('x') == XExecutor  // <-- this is loaded by the name
+        factory.getExecutorClass(null) == LocalExecutor
+        factory.getExecutorClass('local') == LocalExecutor
+        factory.getExecutorClass('sge') == SgeExecutor
+        factory.getExecutorClass('oge') == SgeExecutor
+        factory.getExecutorClass('uge') == SgeExecutor
+        factory.getExecutorClass('lsf') == LsfExecutor
+        factory.getExecutorClass('pbs') == PbsExecutor
+        factory.getExecutorClass('slurm') == SlurmExecutor
+        factory.getExecutorClass('condor') == CondorExecutor
+        factory.getExecutorClass('k8s') == K8sExecutor
+        factory.getExecutorClass('awsbatch') == AwsBatchExecutor
+        factory.getExecutorClass('AwsBatch') == AwsBatchExecutor
+        factory.getExecutorClass('x') == XExecutor  // <-- this is loaded by the name
 
         when:
-        factory.loadExecutorClass('xyz')
+        factory.getExecutorClass('xyz')
         then:
         thrown(IllegalArgumentException)
 
     }
 
-    def 'should sge executor'() {
-        when:
-        def factory = new ExecutorFactory()
-        then:
-        factory.loadExecutorClass('sge') == SgeExecutor
-    }
+    def 'should not duplicate executor instance' () {
+        given:
+        def NAME = "SLURM"
+        def config = Mock(ProcessConfig)
+        def session = Mock(Session)
+        def script = Mock(TaskBody)
+        script.type >> ScriptType.SCRIPTLET
+        def factory = Spy(ExecutorFactory)
+        def clazz = SlurmExecutor.class
+        def executor = Mock(SlurmExecutor)
 
+        when:
+        def result = factory.getExecutor('proc_a', config, script, session)
+        then:
+        1 * factory.getExecutorName(config, session) >> NAME
+        1 * factory.getExecutorClass(NAME) >> clazz
+        1 * factory.isTypeSupported(ScriptType.SCRIPTLET, clazz) >> true
+        1 * factory.createExecutor(clazz, NAME, session) >> executor
+        result.is(executor)
+
+        when:
+        factory.executors.put(clazz, executor)
+        result = factory.getExecutor('proc_b', config, script, session)
+        then:
+        1 * factory.getExecutorName(config, session) >> NAME
+        1 * factory.getExecutorClass(NAME) >> clazz
+        1 * factory.isTypeSupported(ScriptType.SCRIPTLET, clazz) >> true
+        0 * factory.createExecutor(clazz, NAME, session)
+        result.is(executor)
+
+    }
+    
 
     def 'should check type supported'() {
 

@@ -122,7 +122,7 @@ class ProcessFactory {
         applyConfig(name, processConfig, legacySettings)
 
         // -- get the executor for the given process config
-        final execObj = executorFactory.createExecutor(name, processConfig, script, session)
+        final execObj = executorFactory.getExecutor(name, processConfig, script, session)
 
         // -- create processor class
         newTaskProcessor( name, execObj, processConfig, script )

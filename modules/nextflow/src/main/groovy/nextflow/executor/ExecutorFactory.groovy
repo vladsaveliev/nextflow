@@ -61,6 +61,8 @@ class ExecutorFactory {
 
     @PackageScope Map executorsMap
 
+    private Map<Class<? extends Executor>,? extends Executor> executors = new HashMap<>()
+
     ExecutorFactory() {
         executorsMap = new HashMap(20)
         // add built-in executors
@@ -92,7 +94,7 @@ class ExecutorFactory {
         return name
     }
 
-    protected Class<? extends Executor> loadExecutorClass(String executorName) {
+    protected Class<? extends Executor> getExecutorClass(String executorName) {
         log.debug ">> processorType: '$executorName'"
         if( !executorName )
             return LocalExecutor
@@ -123,7 +125,7 @@ class ExecutorFactory {
     }
 
 
-    protected boolean isTypeSupported(ScriptType type, executor ) {
+    protected boolean isTypeSupported( ScriptType type, executor ) {
 
         if( executor instanceof Executor ) {
             executor = executor.class
@@ -140,24 +142,33 @@ class ExecutorFactory {
         throw new IllegalArgumentException("Specified argument is not a valid executor class: $executor")
     }
 
-
-    Executor createExecutor(String name, ProcessConfig processConfig, TaskBody script, Session session ) {
+    Executor getExecutor(String processName, ProcessConfig processConfig, TaskBody script, Session session ) {
         // -- load the executor to be used
-        def execName = getExecutorName(processConfig,session) ?: DEFAULT_EXECUTOR
-        def execClass = loadExecutorClass(execName)
+        def name = getExecutorName(processConfig,session) ?: DEFAULT_EXECUTOR
+        def clazz = getExecutorClass(name)
 
-        if( !isTypeSupported(script.type, execClass) ) {
-            log.warn "Process '$name' cannot be executed by '$execName' executor -- Using 'local' executor instead"
-            execName = 'local'
-            execClass = LocalExecutor.class
+        if( !isTypeSupported(script.type, clazz) ) {
+            log.warn "Process '$processName' cannot be executed by '$name' executor -- Using 'local' executor instead"
+            name = 'local'
+            clazz = LocalExecutor.class
         }
 
-        def execObj = execClass.newInstance()
-        // -- inject the task configuration into the executor instance
-        execObj.session = session
-        execObj.name = execName
-        execObj.init()
-        return execObj
+        // this code is not supposed to be executed parallel
+        def result = executors.get(clazz)
+        if( result )
+            return result
+
+        result = createExecutor(clazz, name, session)
+        executors.put(clazz, result)
+        return result
+    }
+
+    protected Executor createExecutor( Class<? extends Executor> clazz, String name, Session session) {
+        def result = clazz.newInstance()
+        result.session = session
+        result.name = name
+        result.init()
+        return result
     }
 
     /**
@@ -166,7 +177,7 @@ class ExecutorFactory {
      * @param taskConfig
      */
     @CompileDynamic
-    private String getExecutorName(ProcessConfig taskConfig, Session session) {
+    protected String getExecutorName(ProcessConfig taskConfig, Session session) {
         // create the processor object
         def result = taskConfig.executor?.toString()
 
@@ -181,6 +192,11 @@ class ExecutorFactory {
 
         log.debug "<< taskConfig executor: $result"
         return result
+    }
+
+    void signalExecutors() {
+        for( Executor exec : executors.values() )
+            exec.signal()
     }
 
 }

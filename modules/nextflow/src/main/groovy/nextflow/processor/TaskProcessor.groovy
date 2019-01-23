@@ -1939,7 +1939,7 @@ class TaskProcessor {
         makeTaskContextStage3(task, hash, folder)
 
         // add the task to the collection of running tasks
-        session.dispatcher.submit(task, blocking)
+        executor.submit(task, blocking)
 
     }
 

@@ -116,7 +116,7 @@ class ProcessDef extends Closure {
         // create the executor
         final executor = session
                 .executorFactory
-                .createExecutor(name, processConfig, taskBody, session)
+                .getExecutor(name, processConfig, taskBody, session)
 
         //create processor class
         processFactory

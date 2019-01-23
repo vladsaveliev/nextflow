@@ -46,7 +46,6 @@ import nextflow.processor.ErrorStrategy
 import nextflow.processor.ProcessConfig
 import nextflow.processor.ProcessFactory
 import nextflow.processor.ProcessLibrary
-import nextflow.processor.TaskDispatcher
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
@@ -96,11 +95,6 @@ class Session implements ISession {
      * Creates process executors
      */
     ExecutorFactory executorFactory
-
-    /**
-     * Dispatch tasks for executions
-     */
-    TaskDispatcher dispatcher
 
     /**
      * Script binding
@@ -268,11 +262,6 @@ class Session implements ISession {
      */
     int getPoolSize() { poolSize }
 
-    /**
-     * @return The session {@link TaskDispatcher}
-     */
-    TaskDispatcher getDispatcher() { dispatcher }
-
     CacheDB getCache() { cache }
 
     /**
@@ -321,9 +310,6 @@ class Session implements ISession {
         // -- set the thread pool size
         this.poolSize = config.poolSize as int
         log.debug "Executor pool size: ${poolSize}"
-
-        // -- create the task dispatcher instance
-        this.dispatcher = new TaskDispatcher(this)
 
         // -- DGA object
         this.dag = new DAG(session:this)
@@ -541,8 +527,6 @@ class Session implements ISession {
 
         // create tasks executor
         execService = Executors.newFixedThreadPool(poolSize)
-        // signal start to tasks dispatcher
-        dispatcher.start()
         // signal start to trace observers
         observers.each { trace -> trace.onFlowStart(this) }
 
@@ -758,7 +742,7 @@ class Session implements ISession {
         log.info "Execution cancelled -- Finishing pending tasks before exit"
         cancelled = true
         notifyError(handler)
-        dispatcher.signal()
+        executorFactory.signalExecutors()
         processesBarrier.forceTermination()
         allOperators *. terminate()
     }
@@ -780,7 +764,7 @@ class Session implements ISession {
                 log.debug(status)
             // force termination
             notifyError(null)
-            dispatcher.signal()
+            executorFactory.signalExecutors()
             processesBarrier.forceTermination()
             monitorsBarrier.forceTermination()
             operatorsForceTermination()
