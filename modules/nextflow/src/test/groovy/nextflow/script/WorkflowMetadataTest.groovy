@@ -28,6 +28,8 @@ import nextflow.trace.TraceRecord
 import nextflow.util.Duration
 import nextflow.util.VersionNumber
 import org.eclipse.jgit.api.Git
+import test.TestHelper
+
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -137,68 +139,16 @@ class WorkflowMetadataTest extends Specification {
     def 'should access workflow script variables onComplete' () {
 
         given:
-        def dir = Files.createTempDirectory('test')
-        dir.resolve('main.nf').text = "println 'Hello world'"
-        def script = new ScriptFile(dir.resolve('main.nf').toFile())
+        def file = TestHelper.createInMemTempFile('main.nf', "println 'Hello world'")
+        def script = new ScriptFile(file)
 
         def session = Spy(Session)
-        session.fetchContainers() >> 'busybox/latest'
-        session.commandLine >> 'nextflow run -this -that'
-
-        when:
         def metadata = new WorkflowMetadata(session, script)
+
         session.binding.setVariable('value_a', 1)
         session.binding.setVariable('value_b', 2)
         session.binding.setVariable('workflow', metadata)
-
-        def result1
-        def result2
-        def result3
-        def result4
-        def result5
-        def result6
-
-        def handler = {
-            result1 = workflow.commandLine   // workflow property
-            result2 = workflow      // workflow object itself
-            result3 = value_a       // variable in the session binding
-            result4 = events        // workflow private field, should not be accessed
-            result5 = xyz           // unknown field, should return null
-            result6 = foo_test_method()
-        }
-        metadata.onComplete(handler)
-        metadata.invokeOnComplete()
-
-        then:
-        result1 == metadata.commandLine
-        result2 == metadata
-        result3 == 1
-        result4 == null
-        result5 == null
-        result6 == 'foo_value'
-
-        cleanup:
-        dir?.deleteDir()
-
-    }
-
-    def 'should access workflow script variables onError' () {
-
-        given:
-        def dir = Files.createTempDirectory('test')
-        dir.resolve('main.nf').text = "println 'Hello world'"
-        def script = new ScriptFile(dir.resolve('main.nf').toFile())
-
-        def session = Spy(Session)
-        //session.containerConfig >> new ContainerConfig()
-        session.fetchContainers() >> 'busybox/latest'
-        session.commandLine >> 'nextflow run -this -that'
-
-        when:
-        def metadata = new WorkflowMetadata(session, script)
-        session.binding.setVariable('value_a', 1)
-        session.binding.setVariable('value_b', 2)
-        session.binding.setVariable('workflow', metadata)
+        session.binding.setParams(foo: 'Hello', bar: 'world')
 
         def result1
         def result2
@@ -215,8 +165,60 @@ class WorkflowMetadataTest extends Specification {
             result4 = events        // workflow private field, should not be accessed
             result5 = xyz           // unknown field, should return null
             result6 = foo_test_method()
-            result7 = workflow.success
+            result7 = "$params.foo $params.bar"
         }
+
+        when:
+        metadata.onComplete(handler)
+        metadata.invokeOnComplete()
+
+        then:
+        result1 == metadata.commandLine
+        result2 == metadata
+        result3 == 1
+        result4 == null
+        result5 == null
+        result6 == 'foo_value'
+        result7 == 'Hello world'
+
+
+    }
+
+    def 'should access workflow script variables onError' () {
+
+        given:
+        def file = TestHelper.createInMemTempFile('main.nf', "println 'Hello world'")
+        def script = new ScriptFile(file)
+
+        def session = Spy(Session)
+        def metadata = new WorkflowMetadata(session, script)
+        
+        session.binding.setVariable('value_a', 1)
+        session.binding.setVariable('value_b', 2)
+        session.binding.setVariable('workflow', metadata)
+        session.binding.setParams(foo: 'Hello', bar: 'world')
+
+        def result1
+        def result2
+        def result3
+        def result4
+        def result5
+        def result6
+        def result7
+        def result8
+
+        def handler = {
+            result1 = workflow.commandLine   // workflow property
+            result2 = workflow      // workflow object itself
+            result3 = value_a       // variable in the session binding
+            result4 = events        // workflow private field, should not be accessed
+            result5 = xyz           // unknown field, should return null
+            result6 = foo_test_method()
+            result7 = "$params.foo $params.bar"
+            result8 = workflow.success
+        }
+
+        when:
         metadata.onError(handler)
         metadata.invokeOnError(Mock(TraceRecord))
 
@@ -227,12 +229,9 @@ class WorkflowMetadataTest extends Specification {
         result4 == null
         result5 == null
         result6 == 'foo_value'
-        result7 == false
-
-        cleanup:
-        dir?.deleteDir()
+        result7 == 'Hello world'
+        result8 == false
 
     }
-
 
 }

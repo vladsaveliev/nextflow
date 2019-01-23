@@ -19,6 +19,7 @@ package nextflow.processor
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
+import nextflow.Session
 import nextflow.script.BaseScript
 import nextflow.script.EachInParam
 import nextflow.script.InputsList
@@ -45,6 +46,8 @@ class ProcessDef extends Closure {
 
     private OutputsList outputs
 
+    private Session session
+
     ProcessDef(BaseScript owner, String name, ProcessFactory factory, ProcessConfig config, TaskBody body) {
         super(owner)
         this.name = name
@@ -53,6 +56,7 @@ class ProcessDef extends Closure {
         this.taskBody = body
         this.inputs = config.getInputs()
         this.outputs = config.getOutputs()
+        this.session = processFactory.session
     }
 
     BaseScript getOwner() {
@@ -110,9 +114,11 @@ class ProcessDef extends Closure {
         }
 
         // create the executor
-        final executor = processFactory.createExecutor(name, processConfig, taskBody)
+        final executor = session
+                .executorFactory
+                .createExecutor(name, processConfig, taskBody, session)
 
-        // -- create processor class
+        //create processor class
         processFactory
                 .newTaskProcessor(name, executor, processConfig, taskBody)
                 .run()

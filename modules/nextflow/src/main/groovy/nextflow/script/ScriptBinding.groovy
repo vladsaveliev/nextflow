@@ -21,7 +21,6 @@ import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Session
-import nextflow.util.ReadOnlyMap
 import org.apache.commons.lang.StringUtils
 /**
  * Defines the script execution context. By default provided the following variables
@@ -44,6 +43,10 @@ class ScriptBinding extends Binding {
 
     Session session
 
+    private List<String> args
+
+    private ParamsMap params
+
     /**
      * Creates a new nextflow script binding object
      *
@@ -51,7 +54,27 @@ class ScriptBinding extends Binding {
      * @return A new {@link ScriptBinding} instance
      */
     ScriptBinding() {
-        super( new ReadOnlyMap( [args:[], params: new ParamsMap() ]) )
+        this(new LinkedHashMap(20))
+    }
+
+    protected ScriptBinding(Map vars) {
+        super(vars)
+
+        // create and populate args
+        args = new ArrayList<>()
+        if( vars.args ) {
+            if( !(vars.args instanceof List) ) throw new IllegalArgumentException("ScriptBinding 'args' must be a List value")
+            args.addAll((List)vars.args)
+        }
+        vars.put('args', args)
+        
+        // create and populate args
+        params = new ParamsMap()
+        if( vars.params ) {
+            if( !(vars.params instanceof Map) ) throw new IllegalArgumentException("ScriptBinding 'params' must be a Map value")
+            params.putAll((Map)vars.params)
+        }
+        vars.params = params
     }
 
     @Memoized
@@ -71,19 +94,26 @@ class ScriptBinding extends Binding {
      *
      * @param values
      */
-    void setParams( Map<String,Object> values ) {
-        if( !values )
-            return
-        def params = (ParamsMap)super.getVariable('params')
-        params.putAll(values)
+    ScriptBinding setParams( Map<String,Object> values ) {
+        if( values )
+            params.putAll(values)
+        return this
+    }
+
+    ScriptBinding setSession( Session session ) {
+        this.session = session
+        return this
     }
 
     /**
      * The list of CLI arguments (unnamed)
      * @param values
      */
-    void setArgs( List<String> values ) {
-        (getVariables() as ReadOnlyMap).force( 'args', values  )
+    ScriptBinding setArgs( List<String> values ) {
+        args.clear()
+        if( values )
+         args.addAll(values)
+        return this
     }
 
     /**
@@ -95,18 +125,16 @@ class ScriptBinding extends Binding {
      */
     def getVariable( String name ) {
 
-        if( super.hasVariable(name) ) {
+        if( super.hasVariable(name) )
             return super.getVariable(name)
-        }
-        else if( configEnv.containsKey(name) ) {
-            configEnv.get(name)
-        }
-        else if( sysEnv.containsKey(name) ) {
+
+        if( configEnv.containsKey(name) )
+            return configEnv.get(name)
+
+        if( sysEnv.containsKey(name) )
             return sysEnv.get(name)
-        }
-        else {
-            throw new MissingPropertyException(name, getClass())
-        }
+
+        throw new MissingPropertyException(name, getClass())
     }
 
     /**
@@ -123,17 +151,8 @@ class ScriptBinding extends Binding {
     void setVariable( String name, Object value ) {
         if( name == 'channel' )
             log.warn 'The use of the identifier `channel` as variable name is discouraged and will be deprecated in a future version'
-        super.setVariable(name, value)
-    }
-
-    ScriptBinding setVariables(Map<String,Object> vars) {
-        if( vars ) for( Map.Entry<String,Object> entry : vars ) {
-            if( entry.key == 'params' && entry.value instanceof Map )
-                setParams((Map)entry.value)
-            else
-                setVariable(entry.key, entry.value)
-        }
-        return this
+        if( name != 'args' && name != 'params' )
+            super.setVariable(name, value)
     }
 
     /**

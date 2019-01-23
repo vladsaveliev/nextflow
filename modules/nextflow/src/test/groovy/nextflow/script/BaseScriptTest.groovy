@@ -31,18 +31,24 @@ class BaseScriptTest extends Specification {
 
     def 'should define a process and invoke it' () {
         given:
-        def SCRIPT = '''
-        processDef foo {
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
           input: val sample
           output: stdout() 
           script:
           /echo Hello $sample/
-        }
-        
-        hello_ch = Channel.from('world')
-        
-        foo(hello_ch)
+        }        
         '''
+
+        SCRIPT.text = """
+        require "$MODULE"
+        hello_ch = Channel.from('world')
+        foo(hello_ch)
+        """
 
         when:
         def runner = new ScriptRunner([process:[executor:'nope']])
@@ -51,12 +57,19 @@ class BaseScriptTest extends Specification {
         noExceptionThrown()
         result instanceof DataflowReadChannel
         result.val == 'echo Hello world'
+
+        cleanup:
+        folder?.deleteDir()
     }
 
     def 'should define a process with multiple inputs' () {
         given:
-        def SCRIPT = '''
-        processDef foo {
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
           input: 
             val sample
             set pairId, reads
@@ -65,12 +78,16 @@ class BaseScriptTest extends Specification {
           script:
             /echo sample=$sample pairId=$pairId reads=$reads/
         }
-        
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"
+
         ch1 = Channel.from('world')
         ch2 = Channel.value(['x', '/some/file'])
         
         foo(ch1, ch2)
-        '''
+        """
 
         when:
         def runner = new ScriptRunner([process:[executor:'nope']])
@@ -79,77 +96,19 @@ class BaseScriptTest extends Specification {
         noExceptionThrown()
         result instanceof DataflowReadChannel
         result.val == 'echo sample=world pairId=x reads=/some/file'
+
+        cleanup:
+        folder?.deleteDir()
     }
 
     def 'should define and invoke as an operator' () {
         given:
-        def SCRIPT = '''
-        processDef foo {
-          input: val sample
-          output: stdout() 
-          script:
-          /echo Hello $sample/
-        }
-        
-        Channel.from('world').foo()
-        
-        '''
-
-        when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
-        def result = runner.setScript(SCRIPT).execute()
-        then:
-        noExceptionThrown()
-        result instanceof DataflowReadChannel
-        result.val == 'echo Hello world'
-    }
-
-    def 'should compose processes' () {
-
-        given:
-        def SCRIPT = '''
-        processDef foo {
-          input: 
-            val alpha
-          output: 
-            val delta
-            val gamma
-          script:
-            delta = alpha
-            gamma = 'world'
-            /nope/
-        }
-        
-        processDef bar {
-           input:
-             val xx
-             val yy 
-           output:
-             stdout()
-           script:
-            /echo $xx $yy/            
-        }
-        
-        bar(foo('Ciao'))
-        
-        '''
-
-        when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
-        def result = runner.setScript(SCRIPT).execute()
-        then:
-        noExceptionThrown()
-        result instanceof DataflowReadChannel
-        result.val == 'echo Ciao world'
-
-    }
-
-    def 'should import library' () {
-        given:
         def folder = Files.createTempDirectory('test')
-        def module = folder.resolve('module.nf')
-        module.text = '''
-        processDef foo {
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
           input: val sample
           output: stdout() 
           script:
@@ -157,8 +116,9 @@ class BaseScriptTest extends Specification {
         }
         '''
 
-        def SCRIPT = """
-        importLibrary '$module'
+        SCRIPT.text = """
+        require "$MODULE"
+
         Channel.from('world').foo()
         """
 
@@ -172,6 +132,53 @@ class BaseScriptTest extends Specification {
 
         cleanup:
         folder?.deleteDir()
+    }
+
+    def 'should compose processes' () {
+
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
+          input: 
+            val alpha
+          output: 
+            val delta
+            val gamma
+          script:
+            delta = alpha
+            gamma = 'world\'
+            /nope/
+        }
+        
+        process bar {
+           input:
+             val xx
+             val yy 
+           output:
+             stdout()
+           script:
+            /echo $xx $yy/            
+        }
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"        
+        
+        bar(foo('Ciao'))
+        """
+
+        when:
+        def runner = new ScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result instanceof DataflowReadChannel
+        result.val == 'echo Ciao world'
+
     }
 
 

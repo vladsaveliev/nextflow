@@ -26,8 +26,8 @@ import nextflow.executor.Executor
 import nextflow.executor.ExecutorFactory
 import nextflow.script.BaseScript
 import nextflow.script.ScriptBinding
+import nextflow.script.ScriptParser
 import nextflow.script.TaskBody
-
 /**
  *  Factory class for {@TaskProcessor} instances
  *
@@ -182,8 +182,9 @@ class ProcessFactory {
         final module = resolveModulePath(path)
         try {
             final binding = new ScriptBinding(module: true)
+            binding.setSession(session)
             binding.setParams(params)
-            session.getScriptParser().parse(module,binding).run()
+            new ScriptParser(session).parse(module,binding).run()
         }
         catch( NoSuchFileException e ) {
             throw new IllegalArgumentException("Module file does not exists: $module")
@@ -193,7 +194,7 @@ class ProcessFactory {
         }
     }
 
-    private Path resolveModulePath(def path ) {
+    private Path resolveModulePath( def path ) {
         def result = path as Path
         if( result.fileSystem != session.baseDir.fileSystem )
             throw new IllegalArgumentException("Remote module files are not allowed: ${result.toUriString()}")

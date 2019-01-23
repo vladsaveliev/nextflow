@@ -16,6 +16,7 @@
 
 package nextflow.script
 
+import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
@@ -92,6 +93,10 @@ class ScriptRunner {
 
     ScriptRunner( Session session ) {
         this.session = session
+    }
+
+    ScriptRunner setScript( Path script ) {
+        setScript(new ScriptFile(script))
     }
 
     ScriptRunner setScript( ScriptFile script ) {
@@ -234,20 +239,9 @@ class ScriptRunner {
         }
     }
 
-    @Deprecated
-    protected ScriptRunner init(ScriptFile scriptFile, List<String> args = null) {
-
-        return this
-    }
-
-    protected BaseScript parseScript( File file ) {
-        assert file
-        parseScript( file.text )
-    }
-
     protected BaseScript parseScript( String scriptText ) {
         log.debug "> Script parsing"
-        scriptObj = session.getScriptParser().parse(scriptText, session.binding)
+        scriptObj = new ScriptParser(session).parse(scriptText, session.binding)
         session.scriptClassName = scriptObj.class.simpleName
         return scriptObj
     }

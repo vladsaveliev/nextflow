@@ -53,7 +53,6 @@ import nextflow.processor.TaskProcessor
 import nextflow.script.BaseScript
 import nextflow.script.ScriptBinding
 import nextflow.script.ScriptFile
-import nextflow.script.ScriptParser
 import nextflow.script.ScriptRunner
 import nextflow.script.WorkflowMetadata
 import nextflow.trace.AnsiLogObserver
@@ -102,6 +101,11 @@ class Session implements ISession {
      * Dispatch tasks for executions
      */
     TaskDispatcher dispatcher
+
+    /**
+     * Script binding
+     */
+    ScriptBinding binding
 
     /**
      * Holds the configuration object
@@ -196,8 +200,6 @@ class Session implements ISession {
 
     private volatile Throwable error
 
-    private ScriptBinding binding
-
     private Queue<Closure<Void>> shutdownCallbacks = new ConcurrentLinkedQueue<>()
 
     private int poolSize
@@ -282,7 +284,7 @@ class Session implements ISession {
         assert config != null
 
         this.config = config
-        this.binding = new ScriptBinding()
+        this.binding = new ScriptBinding(session:this, module: false)
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
 
@@ -361,7 +363,7 @@ class Session implements ISession {
         // configure script params
         binding.setParams( (Map)config.params )
         binding.setArgs( new ScriptRunner.ArgsList(args) )
-        
+
         cache = new CacheDB(uniqueId,runName).open()
 
         return this
@@ -565,11 +567,6 @@ class Session implements ISession {
         }
 
         return gcl
-    }
-
-    @Memoized
-    ScriptParser getScriptParser() {
-        new ScriptParser(this)
     }
 
     Barrier getBarrier() { monitorsBarrier }

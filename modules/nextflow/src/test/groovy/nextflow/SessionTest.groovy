@@ -15,17 +15,20 @@
  */
 
 package nextflow
+
+import spock.lang.Specification
+import spock.lang.Unroll
+
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.attribute.PosixFilePermission
 
 import nextflow.container.ContainerConfig
 import nextflow.script.ScriptFile
+import nextflow.script.WorkflowMetadata
 import nextflow.trace.StatsObserver
 import nextflow.trace.TraceFileObserver
 import nextflow.util.Duration
-import spock.lang.Specification
-import spock.lang.Unroll
 import test.TestHelper
 /**
  *
@@ -437,5 +440,58 @@ class SessionTest extends Specification {
         'foo|bar'   | ['baz']       | "There's no process matching config selector: foo|bar"
     }
 
+
+    static Map cfg(String config) {
+        new ConfigSlurper().parse(config).toMap()
+    }
+
+
+    def 'should fetch containers definition' () {
+
+        String text
+
+        when:
+        text = '''
+                process.container = 'beta'
+                '''
+        then:
+        new Session(cfg(text)).fetchContainers() == 'beta'
+
+
+        when:
+        text = '''
+                process {
+                    $proc1 { container = 'alpha' }
+                    $proc2 { container ='beta' }
+                }
+                '''
+        then:
+        new Session(cfg(text)).fetchContainers() == ['$proc1': 'alpha', '$proc2': 'beta']
+
+
+        when:
+        text = '''
+                process {
+                    $proc1 { container = 'alpha' }
+                    $proc2 { container ='beta' }
+                }
+
+                process.container = 'gamma'
+                '''
+        then:
+        new Session(cfg(text)).fetchContainers() == ['$proc1': 'alpha', '$proc2': 'beta', default: 'gamma']
+
+
+        when:
+        text = '''
+                process.container = { "ngi/rnaseq:${workflow.getRevision() ?: 'latest'}" }
+                '''
+
+        def meta = Mock(WorkflowMetadata); meta.getRevision() >> '1.2'
+        def session = new Session(cfg(text))
+        session.binding.setVariable('workflow',meta)
+        then:
+        session.fetchContainers() == 'ngi/rnaseq:1.2'
+    }
 
 }

@@ -16,6 +16,7 @@
 
 package nextflow.script
 
+import nextflow.Session
 import nextflow.util.ReadOnlyMap
 import spock.lang.Specification
 /**
@@ -28,7 +29,8 @@ class ScriptBindingTest extends Specification {
     def 'test params' () {
 
         setup:
-        def bindings = new ScriptBinding(env: [HOME:'/this/path'])
+        def bindings = new ScriptBinding()
+        bindings.session = new Session([env: [HOME:'/this/path']])
         bindings.setParams( [field1: 1, field2: 'dos'] )
         bindings.setArgs(['a','b','c'])
 
@@ -50,6 +52,8 @@ class ScriptBindingTest extends Specification {
 
         // note: BUT it fallback on the local environment
         bindings.getVariable('HOME') == '/this/path'
+        
+        bindings.getVariables().keySet() == ['args','params','variable_x'] as Set
 
     }
 

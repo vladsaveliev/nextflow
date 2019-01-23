@@ -18,6 +18,7 @@ package nextflow.executor
 
 import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Session
 import nextflow.cloud.aws.batch.AwsBatchExecutor
@@ -58,7 +59,7 @@ class ExecutorFactory {
             'awsbatch': AwsBatchExecutor
     ]
 
-    private Map executorsMap
+    @PackageScope Map executorsMap
 
     ExecutorFactory() {
         executorsMap = new HashMap(20)
@@ -165,7 +166,7 @@ class ExecutorFactory {
      * @param taskConfig
      */
     @CompileDynamic
-    private getExecutorName(ProcessConfig taskConfig, Session session) {
+    private String getExecutorName(ProcessConfig taskConfig, Session session) {
         // create the processor object
         def result = taskConfig.executor?.toString()
 

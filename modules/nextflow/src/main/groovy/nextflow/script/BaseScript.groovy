@@ -30,23 +30,26 @@ import nextflow.processor.TaskProcessor
 @Slf4j
 abstract class BaseScript extends Script {
 
+    private Session session
+
+    private ProcessFactory processFactory
+
+    private TaskProcessor taskProcessor
+
     /**
      * The list of process defined in the pipeline script
      */
     private List<String> processNames
 
-    private TaskProcessor taskProcessor
-
     @Lazy InputStream stdin = { System.in }()
 
-    private Session session
+    /** only for testing purpose */
+    private result
 
-    private ProcessFactory processFactory
+    protected BaseScript() { }
 
     protected BaseScript(Binding binding) {
         super(binding)
-        this.session = getBinding().session
-        this.processFactory = session.newProcessFactory(this)
     }
 
     /**
@@ -55,6 +58,8 @@ abstract class BaseScript extends Script {
      */
     protected void init( List<String> processNames ) {
         this.processNames = processNames
+        this.session = getBinding().session
+        this.processFactory = session.newProcessFactory(this)
     }
 
     @Override
@@ -77,14 +82,11 @@ abstract class BaseScript extends Script {
         session.getConfig()
     }
 
-
     /**
      * Access to the last *process* object -- only for testing purpose
      */
     @PackageScope
     TaskProcessor getTaskProcessor() { taskProcessor }
-
-    private result
 
     /**
      * Access to the last *process* result -- only for testing purpose

@@ -15,24 +15,18 @@
  */
 
 package test
-import java.nio.file.Path
+
 
 import groovy.transform.InheritConstructors
-import nextflow.Channel
-import nextflow.Nextflow
 import nextflow.Session
-import nextflow.ast.NextflowDSL
-import nextflow.ast.NextflowXform
 import nextflow.executor.Executor
 import nextflow.processor.ProcessConfig
 import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 import nextflow.script.BaseScript
+import nextflow.script.ScriptBinding
+import nextflow.script.ScriptParser
 import nextflow.script.TaskBody
-import org.apache.commons.lang.StringUtils
-import org.codehaus.groovy.control.CompilerConfiguration
-import org.codehaus.groovy.control.customizers.ASTTransformationCustomizer
-import org.codehaus.groovy.control.customizers.ImportCustomizer
 /**
  * An helper class to parse nextflow script snippets
  *
@@ -42,41 +36,18 @@ class TestParser {
 
     Session session
 
-    TestParser( Map config = null ) {
-        session = config ? new Session(config) : new Session()
+    TestParser() {
+        session = new TestSession()
     }
 
     TestParser( Session session1 ) {
         session = session1
     }
 
-    BaseScript parseScript ( String scriptText, Map map = null ) {
-        parseScript(scriptText, new Binding(map))
-    }
-
-    BaseScript parseScript( String scriptText, Binding binding ) {
-
-        def importCustomizer = new ImportCustomizer()
-        importCustomizer.addImports( StringUtils.name, groovy.transform.Field.name )
-        importCustomizer.addImports( Path.name )
-        importCustomizer.addImports( Channel.name )
-        importCustomizer.addStaticStars( Nextflow.name )
-
-        def config = new CompilerConfiguration()
-        config.scriptBaseClass = BaseScript.class.name
-        config.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowDSL))
-        config.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowXform))
-        config.addCompilationCustomizers(importCustomizer)
-
-        // extend the class-loader if required
-        def gcl = new GroovyClassLoader()
-
-        // run and wait for termination
-        def groovy = new GroovyShell(gcl, binding, config)
-        def script = groovy.parse( scriptText ) as BaseScript
-        // initialize it
-        script.setProcessFactory(new MockProcessFactory(script, session))
-        // return it
+    BaseScript parseScript( String scriptText, Map map = null ) {
+        if( map!=null ) session.binding = new TestBinding(session, map)
+        session.init(null,null)
+        def script = new ScriptParser(session).parse(scriptText, session.binding)
         return script
     }
 
@@ -116,6 +87,22 @@ class TestParser {
     static class MockTaskProcessor extends TaskProcessor {
         @Override
         def run () { }
+    }
+
+    @InheritConstructors
+    static class TestSession extends Session {
+
+        @Override
+        ProcessFactory newProcessFactory(BaseScript script) {
+            return new MockProcessFactory(script, this)
+        }
+    }
+
+    static class TestBinding extends ScriptBinding {
+        TestBinding( Session session, Map map ) {
+            super(map)
+            setSession(session)
+        }
     }
 
 }

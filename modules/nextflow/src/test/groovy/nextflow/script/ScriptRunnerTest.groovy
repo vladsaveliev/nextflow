@@ -310,9 +310,6 @@ class ScriptRunnerTest extends Specification {
               penv 1
               cpus 2
 
-              input:
-              val x
-
               return ''
             }
             '''
@@ -358,9 +355,6 @@ class ScriptRunnerTest extends Specification {
             process hola {
               penv 1
               cpus 2
-
-              input:
-              val x
 
               return ''
             }
@@ -569,54 +563,6 @@ class ScriptRunnerTest extends Specification {
 
     }
 
-    def 'should fetch containers definition' () {
-
-        String text
-
-        when:
-        text = '''
-                process.container = 'beta'
-                '''
-        then:
-        new ScriptRunner(cfg(text)).fetchContainers() == 'beta'
-
-
-        when:
-        text = '''
-                process {
-                    $proc1 { container = 'alpha' }
-                    $proc2 { container ='beta' }
-                }
-                '''
-        then:
-        new ScriptRunner(cfg(text)).fetchContainers() == ['$proc1': 'alpha', '$proc2': 'beta']
-
-
-        when:
-        text = '''
-                process {
-                    $proc1 { container = 'alpha' }
-                    $proc2 { container ='beta' }
-                }
-
-                process.container = 'gamma'
-                '''
-        then:
-        new ScriptRunner(cfg(text)).fetchContainers() == ['$proc1': 'alpha', '$proc2': 'beta', default: 'gamma']
-
-
-        when:
-        text = '''
-                process.container = { "ngi/rnaseq:${workflow.getRevision() ?: 'latest'}" }
-                '''
-
-        def meta = Mock(WorkflowMetadata); meta.getRevision() >> '1.2'
-        def runner = new ScriptRunner(cfg(text))
-        runner.session.binding.setVariable('workflow',meta)
-        then:
-        runner.fetchContainers() == 'ngi/rnaseq:1.2'
-    }
-
     def 'should parse mem and duration units' () {
         given:
         def script = '''  
@@ -645,11 +591,6 @@ class ScriptRunnerTest extends Specification {
         result.time3 == Duration.of(120_000)
         result.flag == true
     }
-
-    static Map cfg(String config) {
-        new ConfigSlurper().parse(config).toMap()
-    }
-
 
     def 'should define directive with a negative value' () {
 
