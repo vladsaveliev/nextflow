@@ -21,6 +21,7 @@ import spock.lang.Specification
 import java.nio.file.Files
 
 import groovyx.gpars.dataflow.DataflowReadChannel
+import test.TestHelper
 
 /**
  *
@@ -64,7 +65,7 @@ class BaseScriptTest extends Specification {
 
     def 'should define a process with multiple inputs' () {
         given:
-        def folder = Files.createTempDirectory('test')
+        def folder = TestHelper.createInMemTempDir()
         def MODULE = folder.resolve('module.nf')
         def SCRIPT = folder.resolve('main.nf')
 
@@ -81,7 +82,7 @@ class BaseScriptTest extends Specification {
         '''
 
         SCRIPT.text = """
-        require "$MODULE"
+        require 'module.nf'
 
         ch1 = Channel.from('world')
         ch2 = Channel.value(['x', '/some/file'])
@@ -96,14 +97,11 @@ class BaseScriptTest extends Specification {
         noExceptionThrown()
         result instanceof DataflowReadChannel
         result.val == 'echo sample=world pairId=x reads=/some/file'
-
-        cleanup:
-        folder?.deleteDir()
     }
 
     def 'should define and invoke as an operator' () {
         given:
-        def folder = Files.createTempDirectory('test')
+        def folder = TestHelper.createInMemTempDir()
         def MODULE = folder.resolve('module.nf')
         def SCRIPT = folder.resolve('main.nf')
 
@@ -117,7 +115,7 @@ class BaseScriptTest extends Specification {
         '''
 
         SCRIPT.text = """
-        require "$MODULE"
+        require 'module.nf'
 
         Channel.from('world').foo()
         """
@@ -130,14 +128,12 @@ class BaseScriptTest extends Specification {
         result instanceof DataflowReadChannel
         result.val == 'echo Hello world'
 
-        cleanup:
-        folder?.deleteDir()
     }
 
     def 'should compose processes' () {
 
         given:
-        def folder = Files.createTempDirectory('test')
+        def folder = TestHelper.createInMemTempDir()
         def MODULE = folder.resolve('module.nf')
         def SCRIPT = folder.resolve('main.nf')
 
@@ -166,7 +162,7 @@ class BaseScriptTest extends Specification {
         '''
 
         SCRIPT.text = """
-        require "$MODULE"        
+        require 'module.nf'        
         
         bar(foo('Ciao'))
         """
@@ -179,14 +175,12 @@ class BaseScriptTest extends Specification {
         result instanceof DataflowReadChannel
         result.val == 'echo Ciao world'
 
-        cleanup:
-        folder?.deleteDir()
     }
 
 
     def 'should inject params in module' () {
         given:
-        def folder = Files.createTempDirectory('test')
+        def folder = TestHelper.createInMemTempDir()
         def MODULE = folder.resolve('module.nf')
         def SCRIPT = folder.resolve('main.nf')
 
@@ -204,7 +198,7 @@ class BaseScriptTest extends Specification {
         // inject params in the module
         // and invoke the process 'foo'
         SCRIPT.text = """ 
-        require "$MODULE", params:[foo:'Hello', bar: 'world']
+        require "module.nf", params:[foo:'Hello', bar: 'world']
         foo()
         """
 
@@ -215,9 +209,7 @@ class BaseScriptTest extends Specification {
         noExceptionThrown()
         result instanceof DataflowReadChannel
         result.val == 'echo Hello world'
-
-        cleanup:
-        folder?.deleteDir()
+        
     }
 
 }

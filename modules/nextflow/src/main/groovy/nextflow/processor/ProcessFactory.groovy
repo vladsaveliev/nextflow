@@ -195,12 +195,19 @@ class ProcessFactory {
     }
 
     private Path resolveModulePath( def path ) {
-        def result = path as Path
-        if( result.fileSystem != session.baseDir.fileSystem )
-            throw new IllegalArgumentException("Remote module files are not allowed: ${result.toUriString()}")
-        if( !result.isAbsolute() )
-            result = session.baseDir.resolve(result)
-        return result
+        assert path
+        
+        final result = path as Path
+        if( result.isAbsolute() )
+            return result
+
+        if( result.scheme == session.baseDir.scheme )
+            return session.baseDir.resolve(result)
+
+        if( path instanceof CharSequence )
+            return session.baseDir.resolve(path.toString())
+
+        throw new IllegalArgumentException("Cannot resolve module path: ${result.toUriString()}")
     }
 
 }
