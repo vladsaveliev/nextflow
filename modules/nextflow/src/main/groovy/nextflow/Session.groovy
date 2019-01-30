@@ -42,6 +42,7 @@ import nextflow.exception.IllegalConfigException
 import nextflow.exception.MissingLibraryException
 import nextflow.executor.ExecutorFactory
 import nextflow.file.FileHelper
+import nextflow.file.FilePorter
 import nextflow.processor.ErrorStrategy
 import nextflow.processor.ProcessConfig
 import nextflow.processor.ProcessFactory
@@ -72,6 +73,7 @@ import nextflow.util.NameGenerator
 import sun.misc.Signal
 import sun.misc.SignalHandler
 import static nextflow.Const.S3_UPLOADER_CLASS
+
 /**
  * Holds the information on the current execution
  *
@@ -208,6 +210,8 @@ class Session implements ISession {
 
     private WorkflowStats workflowStats
 
+    private FilePorter filePorter
+
     boolean getStatsEnabled() { statsEnabled }
 
     private boolean dumpHashes
@@ -233,6 +237,8 @@ class Session implements ISession {
     private AnsiLogObserver ansiLogObserver
 
     AnsiLogObserver getAnsiLogObserver() { ansiLogObserver }
+
+    FilePorter getFilePorter() { filePorter }
 
     /**
      * Creates a new session with an 'empty' (default) configuration
@@ -313,15 +319,19 @@ class Session implements ISession {
 
         // -- DGA object
         this.dag = new DAG(session:this)
+
+        // -- init work dir
+        this.workDir = ((config.workDir ?: 'work') as Path).complete()
+        this.setLibDir( config.libDir as String )
+
+        // -- file porter config
+        this.filePorter = new FilePorter(this)
     }
 
     /**
      * Initialize the session workDir, libDir, baseDir and scriptName variables
      */
     Session init( ScriptFile scriptFile, List<String> args=null ) {
-
-        this.workDir = ((config.workDir ?: 'work') as Path).complete()
-        this.setLibDir( config.libDir as String )
 
         if(!workDir.mkdirs()) throw new AbortOperationException("Cannot create work-dir: $workDir -- Make sure you have write permissions or specify a different directory by using the `-w` command line option")
         log.debug "Work-dir: ${workDir.toUriString()} [${FileHelper.getPathFsType(workDir)}]"
