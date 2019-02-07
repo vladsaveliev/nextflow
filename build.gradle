@@ -87,7 +87,7 @@ allprojects {
 
     dependencies {
         // test configuration
-        testCompile ("org.codehaus.groovy:groovy-test:2.5.5") { exclude group: 'org.codehaus.groovy' }
+        testCompile ("org.codehaus.groovy:groovy-test:2.5.6") { exclude group: 'org.codehaus.groovy' }
         testCompile ("cglib:cglib-nodep:2.2")
         testCompile ("org.objenesis:objenesis:2.1")
         testCompile ("org.spockframework:spock-core:1.2-groovy-2.5") { exclude group: 'org.codehaus.groovy' }
@@ -100,8 +100,8 @@ allprojects {
 
         // Documentation required libraries
         groovyDoc 'org.fusesource.jansi:jansi:1.11'
-        groovyDoc "org.codehaus.groovy:groovy-groovydoc:2.5.5"
-        groovyDoc "org.codehaus.groovy:groovy-ant:2.5.5"
+        groovyDoc "org.codehaus.groovy:groovy-groovydoc:2.5.6"
+        groovyDoc "org.codehaus.groovy:groovy-ant:2.5.6"
     }
 
     // this is required due to this IDEA bug
@@ -536,6 +536,7 @@ task release(type: Exec, dependsOn: [pack, dockerImage]) {
     sleep 1
     github-release release -u nextflow-io -r nextflow -t v$version --pre-release
     github-release upload -u nextflow-io -r nextflow -t v$version --file ${launcherFile} --name ${launcherFile.name}
+    sleep 5
     github-release upload -u nextflow-io -r nextflow -t v$version --file ${nextflowAllFile} --name ${nextflowAllFile.name}
     """.stripIndent()
 
