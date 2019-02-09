@@ -16,6 +16,8 @@
 
 package nextflow.script
 
+import java.nio.file.Path
+
 import groovy.transform.CompileStatic
 import groovy.transform.Memoized
 import groovy.transform.PackageScope
@@ -39,9 +41,11 @@ import org.apache.commons.lang.StringUtils
 @CompileStatic
 class ScriptBinding extends Binding {
 
-    boolean module
+    private Session session
 
-    Session session
+    private boolean module
+
+    private Path scriptPath
 
     private List<String> args
 
@@ -59,7 +63,7 @@ class ScriptBinding extends Binding {
         this(new LinkedHashMap(20))
     }
 
-    protected ScriptBinding(Map vars) {
+    ScriptBinding(Map vars) {
         super(vars)
 
         // create and populate args
@@ -79,6 +83,33 @@ class ScriptBinding extends Binding {
         vars.params = params
     }
 
+    ScriptBinding setSession( Session session ) {
+        this.session = session
+        setConfigEnv(session.configEnv)
+        return this
+    }
+
+    ScriptBinding setScriptPath(Path path) {
+        scriptPath = path
+        return this
+    }
+
+    ScriptBinding setModule( boolean value ) {
+        module = value
+        return this
+    }
+
+    private ScriptBinding setConfigEnv( Map map ) {
+        this.configEnv = map != null ? map : Collections.emptyMap()
+        return this
+    }
+
+    Session getSession() { session }
+
+    boolean getModule() { module }
+
+    Path getScriptPath() { scriptPath }
+
     @Memoized
     protected Map<String,String> getSysEnv() {
         new HashMap(System.getenv())
@@ -92,12 +123,6 @@ class ScriptBinding extends Binding {
     ScriptBinding setParams( Map<String,Object> values ) {
         if( values )
             params.putAll(values)
-        return this
-    }
-
-    ScriptBinding setSession( Session session ) {
-        this.session = session
-        this.configEnv = session.config?.env instanceof Map ? new HashMap<>((Map)session.config.env) : Collections.emptyMap()
         return this
     }
 

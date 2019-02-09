@@ -63,6 +63,6 @@ interface ISession {
 
     boolean isResumeMode()
 
-    Object invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD)
+    Object invokeLibraryMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD)
 
 }

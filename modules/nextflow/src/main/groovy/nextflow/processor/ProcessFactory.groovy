@@ -177,20 +177,23 @@ class ProcessFactory {
         session.library.register(process)
     }
 
-    void require(def path, Map params) {
-        assert path
-        final module = resolveModulePath(path)
+    void require(def module, Map params) {
+        assert module
+        final path = resolveModulePath(module)
         try {
-            final binding = new ScriptBinding(module: true)
-            binding.setSession(session)
+            final binding = new ScriptBinding()
             binding.setParams(params)
-            new ScriptParser(session).parse(module,binding).run()
+
+            new ScriptParser(session)
+                    .setModule(true)
+                    .setBinding(binding)
+                    .runScript(path)
         }
         catch( NoSuchFileException e ) {
-            throw new IllegalArgumentException("Module file does not exists: $module")
+            throw new IllegalArgumentException("Module file does not exists: $path")
         }
         catch( Exception e ) {
-            throw new IllegalArgumentException("Unable to load module file: $module", e)
+            throw new IllegalArgumentException("Unable to load module file: $path", e)
         }
     }
 

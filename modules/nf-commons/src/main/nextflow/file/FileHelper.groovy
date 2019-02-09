@@ -446,7 +446,7 @@ class FileHelper {
 
     @PackageScope
     static Map envFor0(String scheme, Map env) {
-        def result = [:]
+        def result = new LinkedHashMap(10)
         if( scheme?.toLowerCase() == 's3' ) {
 
             List credentials = Global.getAwsCredentials(env)

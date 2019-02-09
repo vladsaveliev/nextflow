@@ -16,7 +16,6 @@
 
 package test
 
-
 import groovy.transform.InheritConstructors
 import nextflow.Session
 import nextflow.executor.Executor
@@ -36,32 +35,31 @@ class TestParser {
 
     Session session
 
-    TestParser() {
-        session = new TestSession()
+    TestParser( Map config = null ) {
+        session = config ? new TestSession(config) : new TestSession()
     }
 
     TestParser( Session session1 ) {
         session = session1
     }
 
-    BaseScript parseScript( String scriptText, Map map = null ) {
-        if( map!=null ) session.binding = new TestBinding(session, map)
+
+    TaskProcessor parseAndGetProcess( String scriptText, Map binding=null ) {
+        if( binding != null ) {
+            session.binding = new ScriptBinding(binding)
+        }
+
         session.init(null,null)
-        def script = new ScriptParser(session).parse(scriptText, session.binding)
-        return script
-    }
-
-    TaskProcessor parseAndGetProcess( String scriptText ) {
-        def script = parseScript(scriptText)
-        script.run()
-        return script.getTaskProcessor()
+        
+        return new ScriptParser(session)
+                .runScript(scriptText)
+                .getScript()
+                .getTaskProcessor()
     }
 
 
-    static TaskProcessor parseAndReturnProcess( String scriptText, Map map = [:] ) {
-        def script = new TestParser().parseScript(scriptText, map)
-        script.run()
-        return script.getTaskProcessor()
+    static TaskProcessor parseAndReturnProcess( String scriptText, Map map = null ) {
+        new TestParser().parseAndGetProcess(scriptText, map)
     }
 
 
@@ -97,12 +95,4 @@ class TestParser {
             return new MockProcessFactory(script, this)
         }
     }
-
-    static class TestBinding extends ScriptBinding {
-        TestBinding( Session session, Map map ) {
-            super(map)
-            setSession(session)
-        }
-    }
-
 }

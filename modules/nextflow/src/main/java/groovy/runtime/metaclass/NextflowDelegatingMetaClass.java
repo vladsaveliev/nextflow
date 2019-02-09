@@ -90,7 +90,7 @@ public class NextflowDelegatingMetaClass extends groovy.lang.DelegatingMetaClass
                 return delegate.invokeMethod(obj, methodName, newArgs);
             }
             else if( obj instanceof DataflowReadChannel ) {
-                return Global.getSession().invokeCustomMethod(obj, methodName, args, e1);
+                return Global.getSession().invokeLibraryMethod(obj, methodName, args, e1);
             }
             else
                 throw e1;

@@ -16,6 +16,7 @@
 
 package nextflow.script
 
+import java.nio.file.Path
 
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
@@ -36,8 +37,6 @@ abstract class BaseScript extends Script {
 
     private TaskProcessor taskProcessor
 
-    private boolean module
-
     /**
      * The list of process defined in the pipeline script
      */
@@ -54,16 +53,24 @@ abstract class BaseScript extends Script {
         super(binding)
     }
 
+    ScriptBinding getBinding() {
+        (ScriptBinding)super.getBinding()
+    }
+
+    private boolean isModule() {
+        getBinding().getModule()
+    }
+
+    private Path getScriptPath() {
+        getBinding().getScriptPath()
+    }
+
     /**
      * This method is get invoked by the DSL parser
      * @param processNames
      */
     protected void init( List<String> processNames ) {
         this.processNames = processNames
-        final binding = (ScriptBinding)getBinding()
-        this.session = binding.session
-        this.module = binding.module
-        this.processFactory = session?.newProcessFactory(this)
     }
 
     @PackageScope
@@ -99,6 +106,15 @@ abstract class BaseScript extends Script {
         session.getConfig().process.echo = value
     }
 
+    private void setup() {
+        session = binding.getSession()
+        processFactory = session.newProcessFactory(this)
+
+        binding.setVariable( 'baseDir', session.baseDir )
+        binding.setVariable( 'workDir', session.workDir )
+        binding.setVariable( 'workflow', session.workflowMetadata )
+        binding.setVariable( 'nextflow', session.workflowMetadata?.nextflow )
+    }
 
     /**
      * Method to which is mapped the *process* declaration when using the following syntax:
@@ -129,7 +145,7 @@ abstract class BaseScript extends Script {
      */
     protected process( String name, Closure body ) {
 
-        if( module ) {
+        if( isModule() ) {
             processFactory.defineProcess(name,body)
         }
         else {
@@ -144,8 +160,15 @@ abstract class BaseScript extends Script {
     }
 
     protected void require(Map opts, path) {
-        def params = opts.params ? (Map)opts.params : null
+        final params = opts.params ? (Map)opts.params : null
         processFactory.require(path, params)
     }
+
+    final Object run() {
+        setup()
+        runScript()
+    }
+
+    abstract Object runScript()
 
 }

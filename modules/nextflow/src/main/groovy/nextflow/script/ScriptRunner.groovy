@@ -44,9 +44,9 @@ class ScriptRunner {
     private Session session
 
     /**
-     * The interpreted script object
+     * The script interpreter
      */
-    private BaseScript scriptObj
+    private ScriptParser scriptParser
 
     /**
      * The pipeline file (it may be null when it's provided as string)
@@ -110,7 +110,7 @@ class ScriptRunner {
     /**
      * @return The interpreted script object
      */
-    BaseScript getScriptObj() { scriptObj }
+    @Deprecated BaseScript getScriptObj() { scriptParser.script }
 
     /**
      * @return The result produced by the script execution
@@ -227,11 +227,8 @@ class ScriptRunner {
         }
     }
 
-    protected BaseScript parseScript( String scriptText ) {
-        log.debug "> Script parsing"
-        scriptObj = new ScriptParser(session).parse(scriptText, session.binding)
-        session.scriptClassName = scriptObj.class.simpleName
-        return scriptObj
+    protected void parseScript( String scriptText ) {
+        scriptParser = new ScriptParser(session).parse(scriptText)
     }
 
     /**
@@ -283,9 +280,9 @@ class ScriptRunner {
      */
     protected run() {
         log.debug "> Launching execution"
-        assert scriptObj, "Missing script instance to run"
+        assert scriptParser, "Missing script instance to run"
         // -- launch the script execution
-        output = scriptObj.run()
+        output = scriptParser.runScript().getResult()
     }
 
     protected terminate() {

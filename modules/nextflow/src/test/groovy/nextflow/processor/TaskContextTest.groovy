@@ -72,10 +72,7 @@ class TaskContextTest extends Specification {
 
     @InheritConstructors
     static class MockScript extends BaseScript {
-        @Override
-        Object run() {
-            return null
-        }
+        @Override Object runScript() { return null }
     }
 
     def 'should dehydrate rehydrate'() {

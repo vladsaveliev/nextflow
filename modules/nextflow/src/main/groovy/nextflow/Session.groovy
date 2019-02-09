@@ -244,7 +244,7 @@ class Session implements ISession {
      * Creates a new session with an 'empty' (default) configuration
      */
     Session() {
-        create([:])
+        create(new LinkedHashMap(10))
     }
 
 
@@ -279,9 +279,9 @@ class Session implements ISession {
         assert config != null
 
         this.config = config
-        this.binding = new ScriptBinding(session:this, module: false)
         this.dumpHashes = config.dumpHashes
         this.dumpChannels = (List<String>)config.dumpChannels
+        this.binding = new ScriptBinding()
 
         // -- poor man session object dependency injection
         Global.setSession(this)
@@ -317,7 +317,7 @@ class Session implements ISession {
         this.poolSize = config.poolSize as int
         log.debug "Executor pool size: ${poolSize}"
 
-        // -- DGA object
+        // -- DAG object
         this.dag = new DAG(session:this)
 
         // -- init work dir
@@ -621,6 +621,14 @@ class Session implements ISession {
             libDir << localLib
         }
         return libDir
+    }
+
+    Map getConfigEnv() {
+        if( !config.env )
+            return Collections.emptyMap()
+        if( config.env instanceof Map )
+            return new LinkedHashMap((Map)config.env)
+        throw new IllegalStateException("Not a valid config env object: $config.env")
     }
 
     @Memoized
@@ -1257,7 +1265,7 @@ class Session implements ISession {
     }
 
 
-    Object invokeCustomMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
+    Object invokeLibraryMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
         library.invoke(channel,methodName,args,MISSING_METHOD)
     }
 

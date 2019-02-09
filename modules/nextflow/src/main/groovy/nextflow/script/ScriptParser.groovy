@@ -20,7 +20,6 @@ import java.nio.file.Path
 
 import com.google.common.hash.Hashing
 import groovy.transform.CompileStatic
-import groovy.transform.Memoized
 import nextflow.Channel
 import nextflow.Nextflow
 import nextflow.Session
@@ -39,14 +38,56 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer
 @CompileStatic
 class ScriptParser {
 
+    private ClassLoader classLoader
+
     private Session session
+
+    private boolean module
+
+    private Path scriptPath
+
+    private BaseScript script
+
+    private Object result
+
+    private ScriptBinding binding
+
+    private CompilerConfiguration config
 
     ScriptParser(Session session) {
         this.session = session
     }
 
-    @Memoized
-    CompilerConfiguration getCompilerConfig() {
+    ScriptParser(ClassLoader loader) {
+        this.classLoader = loader
+    }
+
+    ScriptParser setSession( Session session ) {
+        this.session = session
+        this.classLoader = session.classLoader
+        return this
+    }
+
+    ScriptParser setModule(boolean value) {
+        this.module = value
+        return this
+    }
+
+    ScriptParser setBinding(ScriptBinding binding) {
+        this.binding = binding
+        return this
+    }
+
+    ScriptBinding getBinding() { binding }
+
+    Object getResult() { result }
+
+    BaseScript getScript() { script }
+
+    CompilerConfiguration getConfig() {
+        if( config )
+            return config
+
         // define the imports
         def importCustomizer = new ImportCustomizer()
         importCustomizer.addImports( StringUtils.name, groovy.transform.Field.name )
@@ -56,14 +97,16 @@ class ScriptParser {
         importCustomizer.addImports( MemoryUnit.name )
         importCustomizer.addStaticStars( Nextflow.name )
 
-        def result = new CompilerConfiguration()
-        result.addCompilationCustomizers( importCustomizer )
-        result.scriptBaseClass = BaseScript.class.name
-        result.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowDSL))
-        result.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowXform))
+        config = new CompilerConfiguration()
+        config.addCompilationCustomizers( importCustomizer )
+        config.scriptBaseClass = BaseScript.class.name
+        config.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowDSL))
+        config.addCompilationCustomizers( new ASTTransformationCustomizer(NextflowXform))
 
-        result.setTargetDirectory(session.classesDir.toFile())
-        return result
+        if( session && session.classesDir )
+            config.setTargetDirectory(session.classesDir.toFile())
+
+        return config
     }
 
 
@@ -71,42 +114,89 @@ class ScriptParser {
      * Creates a unique name for the main script class in order to avoid collision
      * with the implicit and user variables
      */
-    protected String computeClassName(String text) {
-        final hash = Hashing
-                .murmur3_32()
-                .newHasher()
-                .putUnencodedChars(text)
-                .hash()
+    protected String computeClassName(script) {
+        final PREFIX = 'Script_'
+        final char UNDERSCORE = '_'
 
-        return "_nf_script_${hash}"
+        if( script instanceof Path ) {
+            def str = script.getSimpleName()
+            StringBuilder normalised = new StringBuilder(PREFIX)
+            for( int i=0; i<str.length(); i++ ) {
+                final char ch = str.charAt(i)
+                final valid = i==0 ? Character.isJavaIdentifierStart(ch) : Character.isJavaIdentifierPart(ch)
+                normalised.append( valid ? ch : UNDERSCORE )
+            }
+
+            def result = normalised.toString()
+            while(result.contains('__')) {
+                result = result.replace(/__/,'_')
+            }
+            return result
+        }
+
+        if( script instanceof CharSequence ) {
+            final hash = Hashing
+                    .murmur3_32()
+                    .newHasher()
+                    .putUnencodedChars(script.toString())
+                    .hash()
+            return PREFIX + hash.toString()
+        }
+
+        throw new IllegalArgumentException("Unknown script type: ${script?.getClass()?.getName()}")
     }
 
-    protected void setupBinding(ScriptBinding binding) {
-        binding.setVariable( 'baseDir', session.baseDir )
-        binding.setVariable( 'workDir', session.workDir )
-        binding.setVariable( 'workflow', session.workflowMetadata )
-        binding.setVariable( 'nextflow', session.workflowMetadata?.nextflow )
+    GroovyShell getInterpreter() {
+        if( !binding && session )
+            binding = session.binding
+        if( !binding )
+            throw new IllegalArgumentException("Missing Script binding object")
+
+        return new GroovyShell(classLoader, binding, getConfig())
     }
 
-    GroovyShell getInterpreter(ScriptBinding binding) {
-        setupBinding(binding)
-        final config = getCompilerConfig()
-        final gcl = session.getClassLoader()
-        return new GroovyShell(gcl, binding, config)
-    }
-
-    BaseScript parse(String scriptText, GroovyShell interpreter) {
+    ScriptParser parse(String scriptText, GroovyShell interpreter) {
         final clazzName = computeClassName(scriptText)
-        return (BaseScript)interpreter.parse(scriptText, clazzName)
+        session.scriptClassName = clazzName
+        script = (BaseScript)interpreter.parse(scriptText, clazzName)
+        return this
     }
 
-    BaseScript parse(String scriptText, ScriptBinding binding) {
-        def interpreter = getInterpreter(binding)
-        parse(scriptText, interpreter)
+    ScriptParser parse(String scriptText) {
+        def interpreter = getInterpreter()
+        return parse(scriptText, interpreter)
     }
 
-    BaseScript parse(Path scriptPath, ScriptBinding binding) {
-        parse(scriptPath.text, binding)
+    ScriptParser parse(Path scriptPath) {
+        this.scriptPath = scriptPath
+        parse(scriptPath.text)
+    }
+
+    ScriptParser runScript(Path scriptPath) {
+        this.scriptPath = scriptPath
+        runScript(scriptPath.text)
+        return this
+    }
+
+    ScriptParser runScript(String scriptText) {
+        parse(scriptText)
+        runScript()
+        return this
+    }
+
+    private void setupContext() {
+        assert session
+        binding.setSession(session)
+        binding.setModule(module)
+        binding.setScriptPath(scriptPath)
+    }
+
+    ScriptParser runScript() {
+        assert script
+        setupContext()
+        script.setBinding(binding)
+        result = script.run()
+        return this
     }
 
 }
