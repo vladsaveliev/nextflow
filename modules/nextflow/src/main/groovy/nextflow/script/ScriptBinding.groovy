@@ -53,6 +53,8 @@ class ScriptBinding extends Binding {
 
     private Map configEnv = Collections.emptyMap()
 
+    private List<ProcessDef> definedProcesses = new ArrayList<>(20)
+
     /**
      * Creates a new nextflow script binding object
      *
@@ -83,7 +85,9 @@ class ScriptBinding extends Binding {
         vars.params = params
     }
 
-    ScriptBinding setSession( Session session ) {
+    @PackageScope List<ProcessDef> getDefinedProcesses() { definedProcesses }
+
+    ScriptBinding setSession(Session session ) {
         this.session = session
         setConfigEnv(session.configEnv)
         return this
@@ -94,12 +98,12 @@ class ScriptBinding extends Binding {
         return this
     }
 
-    ScriptBinding setModule( boolean value ) {
+    ScriptBinding setModule(boolean value ) {
         module = value
         return this
     }
 
-    private ScriptBinding setConfigEnv( Map map ) {
+    private ScriptBinding setConfigEnv(Map map ) {
         this.configEnv = map != null ? map : Collections.emptyMap()
         return this
     }
@@ -120,7 +124,7 @@ class ScriptBinding extends Binding {
      *
      * @param values
      */
-    ScriptBinding setParams( Map<String,Object> values ) {
+    ScriptBinding setParams(Map<String,Object> values ) {
         if( values )
             params.putAll(values)
         return this
@@ -130,7 +134,7 @@ class ScriptBinding extends Binding {
      * The list of CLI arguments (unnamed)
      * @param values
      */
-    ScriptBinding setArgs( List<String> values ) {
+    ScriptBinding setArgs(List<String> values ) {
         args.clear()
         if( values )
          args.addAll(values)

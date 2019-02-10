@@ -35,6 +35,10 @@ abstract class BaseScript extends Script {
 
     private TaskProcessor taskProcessor
 
+    private ScriptLibrary library
+
+    private boolean module
+
     /**
      * The list of process defined in the pipeline script
      */
@@ -55,9 +59,6 @@ abstract class BaseScript extends Script {
         (ScriptBinding)super.getBinding()
     }
 
-    private boolean isModule() {
-        getBinding().getModule()
-    }
 
     /**
      * This method is get invoked by the DSL parser
@@ -101,7 +102,9 @@ abstract class BaseScript extends Script {
     }
 
     private void setup() {
+        module = binding.module
         session = binding.getSession()
+        library = new ScriptLibrary(this)
         processFactory = session.newProcessFactory(this)
 
         binding.setVariable( 'baseDir', session.baseDir )
@@ -110,47 +113,15 @@ abstract class BaseScript extends Script {
         binding.setVariable( 'nextflow', session.workflowMetadata?.nextflow )
     }
 
-
-    protected void require(path) {
-        require(Collections.emptyMap(), path)
-    }
-
-    protected void require(Map opts, path) {
-        final params = opts.params ? (Map)opts.params : null
-        processFactory.require(path, params)
-    }
-
-    /**
-     * Method to which is mapped the *process* declaration when using the following syntax:
-     *    <pre>
-     *        process myProcess( option: value[, [..]] ) &#123;
-     *        ..
-     *        &#125;
-     *    </pre>
-     *
-     * @param args The process options specified in the parenthesis after the process name, as shown in the above example
-     * @param name The name of the process, e.g. {@code myProcess} in the above example
-     * @param body The body of the process declaration. It holds all the process definitions: inputs, outputs, code, etc.
-     */
     protected process( Map<String,?> args, String name, Closure body ) {
         throw new DeprecationException("This process invocation syntax is deprecated")
     }
 
-    /**
-     * Method to which is mapped the *process* declaration.
-     *
-     *    <pre>
-     *        process myProcess( option: value[, [..]] ) &#123;
-     *        ..
-     *        &#125;
-     *    </pre>
-     * @param name The name of the process, e.g. {@code myProcess} in the above example
-     * @param body The body of the process declaration. It holds all the process definitions: inputs, outputs, code, etc.
-     */
     protected process( String name, Closure body ) {
 
-        if( isModule() ) {
-            processFactory.defineProcess(name,body)
+        if( module ) {
+            def proc = processFactory.defineProcess(name, body)
+            binding.getDefinedProcesses().add(proc)
         }
         else {
             // create and launch the process
@@ -159,19 +130,37 @@ abstract class BaseScript extends Script {
         }
     }
 
+    protected void require(path) {
+        require(Collections.emptyMap(), path)
+    }
+
+    protected void require(Map opts, path) {
+        final params = opts.params ? (Map)opts.params : null
+        library.load(path, params)
+    }
+    
+
+    @Override
+    Object invokeMethod(String name, Object args) {
+        if( library.contains(name) && !module )
+            library.invoke(name, args as Object[])
+        else
+            super.invokeMethod(name, args)
+    }
+
+
+
     final Object run() {
         setup()
-        runScript()
+        CurrentScript.push(this, !module, binding, library)
+        try {
+            runScript()
+        }
+        finally {
+            CurrentScript.pop()
+        }
     }
 
     protected abstract Object runScript()
-
-    Object methodMissing( String name, def args ) {
-        def missing = !session.library.contains(name) || isModule()
-        if( missing )
-            throw new MissingMethodException(name, this.class)
-        // invoke method or process from the library
-        return session.library.invoke(name, args as Object[])
-    }
 
 }

@@ -53,11 +53,6 @@ class ScriptRunner {
      */
     private ScriptFile scriptFile
 
-    /**
-     * The pipeline as a text content
-     */
-    private String scriptText
-
     /*
      * the script raw output
      */
@@ -89,7 +84,6 @@ class ScriptRunner {
 
     ScriptRunner setScript( ScriptFile script ) {
         this.scriptFile = script
-        this.scriptText = script.text
         return this
     }
 
@@ -98,11 +92,6 @@ class ScriptRunner {
         // note config files are collected during the build process
         // this line should be after `ConfigBuilder#build`
         this.session.configFiles = builder.parsedConfigFiles
-    }
-
-    ScriptRunner setScript( String text ) {
-        this.scriptText = text
-        return this
     }
 
     Session getSession() { session }
@@ -130,7 +119,7 @@ class ScriptRunner {
      */
 
     def execute( List<String> args = null ) {
-        assert scriptText
+        assert scriptFile
 
         // init session
         session.init(scriptFile, args)
@@ -139,7 +128,7 @@ class ScriptRunner {
         session.start()
         try {
             // parse the script
-            parseScript(scriptText)
+            parseScript(scriptFile)
             // validate the config
             validate()
             // run the code
@@ -167,13 +156,10 @@ class ScriptRunner {
      * @param args
      */
     def test ( String methodName, List<String> args = null ) {
-        assert scriptText
         assert methodName
-
         // init session
         session.init(scriptFile, args)
-
-        parseScript(scriptText)
+        parseScript(scriptFile)
         def values = args ? args.collect { parseValue(it) } : null
 
         def methodsToTest
@@ -227,8 +213,8 @@ class ScriptRunner {
         }
     }
 
-    protected void parseScript( String scriptText ) {
-        scriptParser = new ScriptParser(session).parse(scriptText)
+    protected void parseScript( ScriptFile scriptFile ) {
+        scriptParser = new ScriptParser(session).parse(scriptFile.main)
     }
 
     /**

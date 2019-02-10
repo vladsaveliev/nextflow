@@ -295,7 +295,6 @@ class SessionTest extends Specification {
         !session.workDir.toString().contains('..')
         session.scriptName == 'pipeline.nf'
         session.classesDir.exists()
-        session.library != null
         session.observers != null
         session.workflowMetadata != null
         

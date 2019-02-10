@@ -44,13 +44,13 @@ import nextflow.executor.ExecutorFactory
 import nextflow.file.FileHelper
 import nextflow.file.FilePorter
 import nextflow.processor.ErrorStrategy
-import nextflow.script.ProcessConfig
-import nextflow.script.ProcessFactory
-import nextflow.script.ProcessLibrary
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.script.BaseScript
+import nextflow.script.CurrentScript
+import nextflow.script.ProcessConfig
+import nextflow.script.ProcessFactory
 import nextflow.script.ScriptBinding
 import nextflow.script.ScriptFile
 import nextflow.script.ScriptRunner
@@ -73,7 +73,6 @@ import nextflow.util.NameGenerator
 import sun.misc.Signal
 import sun.misc.SignalHandler
 import static nextflow.Const.S3_UPLOADER_CLASS
-
 /**
  * Holds the information on the current execution
  *
@@ -87,11 +86,6 @@ class Session implements ISession {
      * Keep a list of all processor created
      */
     final Collection<DataflowProcessor> allOperators = new ConcurrentLinkedQueue<>()
-
-    /**
-     * Keep process definitions included as external modules
-     */
-    ProcessLibrary library
 
     /**
      * Creates process executors
@@ -144,6 +138,8 @@ class Session implements ISession {
     String scriptClassName
 
     Class scriptClass
+
+    BaseScript script
 
     /**
      * Mnemonic name of this run instance
@@ -352,7 +348,6 @@ class Session implements ISession {
 
         // set the byte-code target directory
         this.classesDir = FileHelper.createLocalDir()
-        this.library = new ProcessLibrary(this)
         this.executorFactory = new ExecutorFactory()
         this.observers = createObservers()
         this.statsEnabled = observers.any { it.enableMetrics() }
@@ -367,13 +362,9 @@ class Session implements ISession {
         return this
     }
 
-    Session setBinding( ScriptBinding binding ) {
+    Session setBinding(ScriptBinding binding ) {
         this.binding = binding
         return this
-    }
-
-    ProcessLibrary getLibrary() {
-        library
     }
 
     ProcessFactory newProcessFactory(BaseScript script) {
@@ -1266,9 +1257,12 @@ class Session implements ISession {
         return find.invoke(ClassLoader.getSystemClassLoader(), className)
     }
 
-
     Object invokeLibraryMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
-        library.invoke(channel,methodName,args,MISSING_METHOD)
+        def current = CurrentScript.get()
+        if( current.main )
+            current.library.invoke(channel,methodName,args,MISSING_METHOD)
+        else
+            throw MISSING_METHOD
     }
 
 }

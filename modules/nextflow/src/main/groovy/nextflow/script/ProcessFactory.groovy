@@ -16,17 +16,13 @@
 
 package nextflow.script
 
-import java.nio.file.NoSuchFileException
-import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.Session
-import nextflow.exception.ProcessException
 import nextflow.executor.Executor
 import nextflow.executor.ExecutorFactory
 import nextflow.processor.TaskProcessor
-
 /**
  *  Factory class for {@TaskProcessor} instances
  *
@@ -152,7 +148,7 @@ class ProcessFactory {
         }
     }
 
-    void defineProcess(String name, Closure body) {
+    ProcessDef defineProcess(String name, Closure body) {
         // the config object
         final processConfig = new ProcessConfig(owner).setProcessName(name)
 
@@ -170,53 +166,8 @@ class ProcessFactory {
         // apply config settings to the process
         applyConfig(name, processConfig)
 
-        final process = new ProcessDef(owner, name, this, processConfig.clone(), script)
-        session.library.register(process)
+        new ProcessDef(owner, name, this, processConfig.clone(), script)
     }
 
-    void require(def module, Map params) {
-        assert module
-        final path = resolveModulePath(module)
-        try {
-            final binding = new ScriptBinding() .setParams(params)
-
-            // the execution of a library file has as side effect the registration of declared processes
-            def parser = new ScriptParser(session)
-                            .setModule(true)
-                            .setBinding(binding)
-                            .runScript(path)
-
-            // custom methods need to be registered explicitly
-            for( MethodDef method : parser.getDefinedMethods() ) {
-                session.library.register(method)
-            }
-
-        }
-        catch( ProcessException e ) {
-            throw e
-        }
-        catch( NoSuchFileException e ) {
-            throw new IllegalArgumentException("Module file does not exists: $path")
-        }
-        catch( Exception e ) {
-            throw new IllegalArgumentException("Unable to load module file: $path", e)
-        }
-    }
-
-    private Path resolveModulePath( def path ) {
-        assert path
-        
-        final result = path as Path
-        if( result.isAbsolute() )
-            return result
-
-        if( result.scheme == session.baseDir.scheme )
-            return session.baseDir.resolve(result)
-
-        if( path instanceof CharSequence )
-            return session.baseDir.resolve(path.toString())
-
-        throw new IllegalArgumentException("Cannot resolve module path: ${result.toUriString()}")
-    }
 
 }

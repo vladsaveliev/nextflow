@@ -160,8 +160,9 @@ class ScriptParser {
     ScriptParser parse(String scriptText, GroovyShell interpreter) {
         final clazzName = computeClassName(scriptText)
         script = (BaseScript)interpreter.parse(scriptText, clazzName)
-        session.scriptClassName = clazzName
+        session.script = script
         session.scriptClass = script.class
+        session.scriptClassName = clazzName
         return this
     }
 
@@ -213,6 +214,10 @@ class ScriptParser {
             result.add(new MethodDef(method: method, owner: script, scriptPath: scriptPath))
         }
         return result
+    }
+
+    List<ProcessDef> getDefinedProcesses() {
+        return binding.getDefinedProcesses()
     }
 
 }

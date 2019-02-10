@@ -53,7 +53,7 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
+        def runner = new TestScriptRunner([process:[executor:'nope']])
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -92,7 +92,7 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
+        def runner = new TestScriptRunner([process:[executor:'nope']])
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -122,7 +122,7 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
+        def runner = new TestScriptRunner([process:[executor:'nope']])
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -162,20 +162,30 @@ class BaseScriptTest extends Specification {
         }
         '''
 
+        when:
         SCRIPT.text = """
         require 'module.nf'        
-        
         bar(foo('Ciao'))
         """
-
-        when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
+        def runner = new TestScriptRunner([process:[executor:'nope']])
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
         result instanceof DataflowReadChannel
         result.val == 'echo Ciao world'
 
+
+        when:
+        SCRIPT.text = """
+        require 'module.nf'        
+        (ch0, ch1) = foo('Ciao')
+        """
+        runner = new TestScriptRunner([process:[executor:'nope']])
+        result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result[0].val == 'Ciao'
+        result[1].val == 'world'
     }
 
 
@@ -204,7 +214,7 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        def runner = new ScriptRunner([process:[executor:'nope']])
+        def runner = new TestScriptRunner([process:[executor:'nope']])
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -236,7 +246,7 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        new ScriptRunner([process:[executor:'nope']])
+        new TestScriptRunner([process:[executor:'nope']])
                 .setScript(SCRIPT)
                 .execute()
         then:
@@ -273,11 +283,40 @@ class BaseScriptTest extends Specification {
         """
 
         when:
-        def runner = new ScriptRunner()
+        def runner = new TestScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
         result == 'Hello world!'
+    }
+
+    def 'should access module variables' () {
+        given:
+        def folder = TestHelper.createInMemTempDir()
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''     
+        params.x = 'Hello world'
+        FOO = params.x   
+        process foo {
+          output: stdout() 
+          script:
+          "echo $FOO"
+        }
+        '''
+
+        SCRIPT.text = """
+        require 'module.nf', params:[x: 'Hola mundo']
+        return foo()
+        """
+
+        when:
+        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result.val == 'echo Hola mundo'
     }
 
 }

@@ -80,6 +80,9 @@ class ProcessDef extends Closure {
     }
 
     private call0(Object... args) {
+        if( args.size()==1 && args[0] instanceof ProcessOutputArray )
+            args = args[0] as Object[]
+        
         // sanity check
         if( args.size() != inputs.size() )
             throw new IllegalArgumentException("Process `$name` declares ${inputs.size()} input channels but ${args.size()} were specified")
@@ -92,9 +95,9 @@ class ProcessDef extends Closure {
         // set output channels
         // note: the result object must be an array instead of a List to allow process
         // composition ie. to use the process output as the input in another process invocation
-        Object[] result = null
+        List result = null
         if( outputs.size() ) {
-            result = new Object[outputs.size()]
+            result = new ArrayList<>(outputs.size())
             final allScalarValues = inputs.allScalarInputs()
             final hasEachParams = inputs.any { it instanceof EachInParam }
             final singleton = allScalarValues && !hasEachParams
@@ -122,7 +125,7 @@ class ProcessDef extends Closure {
         if( result.size()==1 )
             return result[0]
         else
-            return result
+            return new ProcessOutputArray(result)
 
     }
 }

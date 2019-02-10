@@ -36,6 +36,10 @@ class ScriptParserTest extends Specification {
         parser.binding.module == false
         parser.binding.session == session
         !session.binding.hasVariable('bar')
+        // session attrs
+        session.script == parser.script
+        session.scriptClass == parser.script.class
+        session.scriptClassName == parser.script.class.simpleName
     }
 
     def 'should run a text script' () {
@@ -130,7 +134,7 @@ class ScriptParserTest extends Specification {
         parser.setBinding(binding)
         parser.runScript(file)
         then:
-        parser.getDefinedMethods().collect{it.method.name} == ['foo','bar']
+        parser.getDefinedMethods().collect{it.method.name} as Set == ['foo','bar'] as Set 
 
     }
 
