@@ -19,8 +19,8 @@ package test
 import groovy.transform.InheritConstructors
 import nextflow.Session
 import nextflow.executor.Executor
-import nextflow.processor.ProcessConfig
-import nextflow.processor.ProcessFactory
+import nextflow.script.ProcessConfig
+import nextflow.script.ProcessFactory
 import nextflow.processor.TaskProcessor
 import nextflow.script.BaseScript
 import nextflow.script.ScriptBinding

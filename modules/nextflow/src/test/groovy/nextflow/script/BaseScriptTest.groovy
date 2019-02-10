@@ -21,6 +21,7 @@ import spock.lang.Specification
 import java.nio.file.Files
 
 import groovyx.gpars.dataflow.DataflowReadChannel
+import nextflow.exception.ProcessDuplicateException
 import test.TestHelper
 
 /**
@@ -210,6 +211,73 @@ class BaseScriptTest extends Specification {
         result instanceof DataflowReadChannel
         result.val == 'echo Hello world'
         
+    }
+
+    def 'should error on process duplication' () {
+
+        given:
+        def folder = TestHelper.createInMemTempDir()
+        def LIB1 = folder.resolve('lib1.nf')
+        def LIB2 = folder.resolve('lib2.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        def lib = '''
+        process foo {
+          'echo ciao'
+        }    
+        '''
+        LIB1.text = lib
+        LIB2.text = lib
+
+        SCRIPT.text = """ 
+        require 'lib1.nf'
+        require 'lib2.nf'
+        foo()
+        """
+
+        when:
+        new ScriptRunner([process:[executor:'nope']])
+                .setScript(SCRIPT)
+                .execute()
+        then:
+        def err = thrown(ProcessDuplicateException)
+        err.message == """\
+            Process `foo` is defined in multiple library files:
+              ${LIB1.toUriString()}
+              ${LIB2.toUriString()}
+            """.stripIndent()
+
+    }
+
+    def 'should invoke custom functions' () {
+        given:
+        def folder = TestHelper.createInMemTempDir()
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        def foo(str) {
+          str.reverse()
+        }
+        
+        def bar(a, b) {
+          return "$a $b!"
+        }
+        '''
+
+        SCRIPT.text = """
+        require 'module.nf'
+
+        def str = foo('dlrow')
+        return bar('Hello', str)
+        """
+
+        when:
+        def runner = new ScriptRunner()
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        noExceptionThrown()
+        result == 'Hello world!'
     }
 
 }

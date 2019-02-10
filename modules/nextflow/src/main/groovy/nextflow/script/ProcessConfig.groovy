@@ -14,8 +14,11 @@
  * limitations under the License.
  */
 
-package nextflow.processor
+package nextflow.script
 
+import nextflow.processor.ConfigList
+import nextflow.processor.ErrorStrategy
+import nextflow.processor.TaskConfig
 import static nextflow.util.CacheHelper.*
 
 import java.util.regex.Pattern
@@ -27,23 +30,7 @@ import nextflow.exception.ConfigParseException
 import nextflow.exception.IllegalConfigException
 import nextflow.exception.IllegalDirectiveException
 import nextflow.executor.BashWrapperBuilder
-import nextflow.script.BaseScript
-import nextflow.script.DefaultInParam
-import nextflow.script.DefaultOutParam
-import nextflow.script.EachInParam
-import nextflow.script.EnvInParam
-import nextflow.script.FileInParam
-import nextflow.script.FileOutParam
-import nextflow.script.InParam
-import nextflow.script.InputsList
-import nextflow.script.OutParam
-import nextflow.script.OutputsList
-import nextflow.script.SetInParam
-import nextflow.script.SetOutParam
-import nextflow.script.StdInParam
-import nextflow.script.StdOutParam
-import nextflow.script.ValueInParam
-import nextflow.script.ValueOutParam
+
 /**
  * Holds the process configuration properties
  *

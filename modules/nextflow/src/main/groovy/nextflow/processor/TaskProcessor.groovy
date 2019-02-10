@@ -71,6 +71,7 @@ import nextflow.script.InParam
 import nextflow.script.MissingParam
 import nextflow.script.OptionalParam
 import nextflow.script.OutParam
+import nextflow.script.ProcessConfig
 import nextflow.script.ScriptType
 import nextflow.script.SetInParam
 import nextflow.script.SetOutParam

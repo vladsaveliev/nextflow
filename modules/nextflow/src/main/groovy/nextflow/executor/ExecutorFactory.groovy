@@ -23,7 +23,7 @@ import groovy.util.logging.Slf4j
 import nextflow.Session
 import nextflow.cloud.aws.batch.AwsBatchExecutor
 import nextflow.k8s.K8sExecutor
-import nextflow.processor.ProcessConfig
+import nextflow.script.ProcessConfig
 import nextflow.script.ScriptType
 import nextflow.script.TaskBody
 import nextflow.util.ServiceDiscover

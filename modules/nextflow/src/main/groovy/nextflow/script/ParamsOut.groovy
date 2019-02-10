@@ -25,7 +25,6 @@ import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.exception.IllegalFileException
 import nextflow.file.FilePatternSplitter
-import nextflow.processor.ProcessConfig
 import nextflow.util.BlankSeparatedList
 /**
  * Model a process generic input parameter

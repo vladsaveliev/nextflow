@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package nextflow.processor
+package nextflow.script
 
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
@@ -22,12 +22,11 @@ import java.nio.file.Path
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
 import nextflow.Session
+import nextflow.exception.ProcessException
 import nextflow.executor.Executor
 import nextflow.executor.ExecutorFactory
-import nextflow.script.BaseScript
-import nextflow.script.ScriptBinding
-import nextflow.script.ScriptParser
-import nextflow.script.TaskBody
+import nextflow.processor.TaskProcessor
+
 /**
  *  Factory class for {@TaskProcessor} instances
  *
@@ -55,8 +54,6 @@ class ProcessFactory {
         this.executorFactory = session.executorFactory
     }
 
-    Session getSession() { session }
-
     /**
      * Create a new task processor and initialise with the given parameters
      *
@@ -66,9 +63,9 @@ class ProcessFactory {
      * @param script The owner script
      * @param config The process configuration
      * @param taskBody The process task body
-     * @return An instance of {@link TaskProcessor}
+     * @return An instance of {@link nextflow.processor.TaskProcessor}
      */
-    protected TaskProcessor newTaskProcessor( String name, Executor executor, ProcessConfig config, TaskBody taskBody ) {
+    protected TaskProcessor newTaskProcessor(String name, Executor executor, ProcessConfig config, TaskBody taskBody ) {
         new TaskProcessor(name, executor, session, owner, config, taskBody)
     }
 
@@ -181,13 +178,22 @@ class ProcessFactory {
         assert module
         final path = resolveModulePath(module)
         try {
-            final binding = new ScriptBinding()
-            binding.setParams(params)
+            final binding = new ScriptBinding() .setParams(params)
 
-            new ScriptParser(session)
-                    .setModule(true)
-                    .setBinding(binding)
-                    .runScript(path)
+            // the execution of a library file has as side effect the registration of declared processes
+            def parser = new ScriptParser(session)
+                            .setModule(true)
+                            .setBinding(binding)
+                            .runScript(path)
+
+            // custom methods need to be registered explicitly
+            for( MethodDef method : parser.getDefinedMethods() ) {
+                session.library.register(method)
+            }
+
+        }
+        catch( ProcessException e ) {
+            throw e
         }
         catch( NoSuchFileException e ) {
             throw new IllegalArgumentException("Module file does not exists: $path")

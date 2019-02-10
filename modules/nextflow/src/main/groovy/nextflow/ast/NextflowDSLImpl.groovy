@@ -337,7 +337,7 @@ class NextflowDSLImpl implements ASTTransformation {
          * Converts a `when` block into a when method call expression. The when code is converted into a
          * closure expression and set a `when` directive in the process configuration properties.
          *
-         * See {@link nextflow.processor.ProcessConfig#configProperties}
+         * See {@link nextflow.script.ProcessConfig#configProperties}
          * See {@link nextflow.processor.TaskConfig#getGuard(java.lang.String)}
          */
         protected void addWhenGuardCall( List<Statement> statements, StringBuilder source, BlockStatement parent ) {
@@ -856,7 +856,7 @@ class NextflowDSLImpl implements ASTTransformation {
             def name = nested.getMethodAsString()
             // check the process name is not defined yet
             if( !processNames.add(name) ) {
-                unit.addError( new SyntaxException("Process `$name` is already define", methodCall.lineNumber, methodCall.columnNumber+8) )
+                unit.addError( new SyntaxException("Process `$name` is already defined", methodCall.lineNumber, methodCall.columnNumber+8) )
                 return
             }
 

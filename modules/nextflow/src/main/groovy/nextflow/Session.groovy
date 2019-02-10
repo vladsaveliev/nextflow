@@ -44,9 +44,9 @@ import nextflow.executor.ExecutorFactory
 import nextflow.file.FileHelper
 import nextflow.file.FilePorter
 import nextflow.processor.ErrorStrategy
-import nextflow.processor.ProcessConfig
-import nextflow.processor.ProcessFactory
-import nextflow.processor.ProcessLibrary
+import nextflow.script.ProcessConfig
+import nextflow.script.ProcessFactory
+import nextflow.script.ProcessLibrary
 import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
@@ -142,6 +142,8 @@ class Session implements ISession {
      * The class name used to compile the pipeline script
      */
     String scriptClassName
+
+    Class scriptClass
 
     /**
      * Mnemonic name of this run instance

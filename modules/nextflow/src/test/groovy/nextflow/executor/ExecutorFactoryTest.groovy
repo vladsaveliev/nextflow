@@ -21,7 +21,7 @@ import spock.lang.Specification
 import nextflow.Session
 import nextflow.cloud.aws.batch.AwsBatchExecutor
 import nextflow.k8s.K8sExecutor
-import nextflow.processor.ProcessConfig
+import nextflow.script.ProcessConfig
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskMonitor
 import nextflow.processor.TaskRun

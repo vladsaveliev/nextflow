@@ -16,12 +16,10 @@
 
 package nextflow.script
 
-import java.nio.file.Path
 
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.Session
-import nextflow.processor.ProcessFactory
 import nextflow.processor.TaskProcessor
 /**
  * Any user defined script will extends this class, it provides the base execution context
@@ -61,10 +59,6 @@ abstract class BaseScript extends Script {
         getBinding().getModule()
     }
 
-    private Path getScriptPath() {
-        getBinding().getScriptPath()
-    }
-
     /**
      * This method is get invoked by the DSL parser
      * @param processNames
@@ -79,7 +73,7 @@ abstract class BaseScript extends Script {
     /**
      * Holds the configuration object which will used to execution the user tasks
      */
-    Map getConfig() {
+    protected Map getConfig() {
         log.warn "The access of `config` object is deprecated"
         session.getConfig()
     }
@@ -101,7 +95,7 @@ abstract class BaseScript extends Script {
      * Enable disable task 'echo' configuration property
      * @param value
      */
-    void echo(boolean value = true) {
+    protected void echo(boolean value = true) {
         log.warn "The use of `echo` method is deprecated"
         session.getConfig().process.echo = value
     }
@@ -114,6 +108,16 @@ abstract class BaseScript extends Script {
         binding.setVariable( 'workDir', session.workDir )
         binding.setVariable( 'workflow', session.workflowMetadata )
         binding.setVariable( 'nextflow', session.workflowMetadata?.nextflow )
+    }
+
+
+    protected void require(path) {
+        require(Collections.emptyMap(), path)
+    }
+
+    protected void require(Map opts, path) {
+        final params = opts.params ? (Map)opts.params : null
+        processFactory.require(path, params)
     }
 
     /**
@@ -155,20 +159,19 @@ abstract class BaseScript extends Script {
         }
     }
 
-    protected void require(path) {
-        require(Collections.emptyMap(), path)
-    }
-
-    protected void require(Map opts, path) {
-        final params = opts.params ? (Map)opts.params : null
-        processFactory.require(path, params)
-    }
-
     final Object run() {
         setup()
         runScript()
     }
 
-    abstract Object runScript()
+    protected abstract Object runScript()
+
+    Object methodMissing( String name, def args ) {
+        def missing = !session.library.contains(name) || isModule()
+        if( missing )
+            throw new MissingMethodException(name, this.class)
+        // invoke method or process from the library
+        return session.library.invoke(name, args as Object[])
+    }
 
 }

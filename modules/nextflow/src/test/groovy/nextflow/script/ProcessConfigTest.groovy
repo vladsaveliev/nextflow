@@ -14,22 +14,23 @@
  * limitations under the License.
  */
 
-package nextflow.processor
+package nextflow.script
 
+import spock.lang.Specification
 import spock.lang.Unroll
 
-import static nextflow.util.CacheHelper.HashMode
-
 import nextflow.exception.IllegalDirectiveException
+import nextflow.processor.ErrorStrategy
 import nextflow.script.BaseScript
 import nextflow.script.FileInParam
+import nextflow.script.ProcessConfig
 import nextflow.script.StdInParam
 import nextflow.script.StdOutParam
 import nextflow.script.TokenVar
 import nextflow.script.ValueInParam
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
-import spock.lang.Specification
+import static nextflow.util.CacheHelper.HashMode
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>

@@ -21,7 +21,6 @@ import nextflow.Session
 import nextflow.config.Manifest
 import nextflow.exception.AbortOperationException
 import nextflow.exception.ProcessUnrecoverableException
-import nextflow.processor.ProcessConfig
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import nextflow.util.VersionNumber

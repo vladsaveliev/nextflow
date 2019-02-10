@@ -28,7 +28,7 @@ import groovyx.gpars.dataflow.expression.DataflowExpression
 import nextflow.Nextflow
 import nextflow.exception.ProcessException
 import nextflow.extension.ToListOp
-import nextflow.processor.ProcessConfig
+
 /**
  * Base class for input/output parameters
  *

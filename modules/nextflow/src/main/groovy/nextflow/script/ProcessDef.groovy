@@ -14,17 +14,15 @@
  * limitations under the License.
  */
 
-package nextflow.processor
+package nextflow.script
+
+import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
 import nextflow.Session
-import nextflow.script.BaseScript
-import nextflow.script.EachInParam
-import nextflow.script.InputsList
-import nextflow.script.OutputsList
-import nextflow.script.TaskBody
+
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -48,6 +46,8 @@ class ProcessDef extends Closure {
 
     private Session session
 
+    private Path scriptPath
+
     ProcessDef(BaseScript owner, String name, ProcessFactory factory, ProcessConfig config, TaskBody body) {
         super(owner)
         this.name = name
@@ -56,7 +56,8 @@ class ProcessDef extends Closure {
         this.taskBody = body
         this.inputs = config.getInputs()
         this.outputs = config.getOutputs()
-        this.session = processFactory.session
+        this.session = owner.binding.session
+        this.scriptPath = owner.binding.scriptPath
     }
 
     BaseScript getOwner() {
@@ -65,6 +66,8 @@ class ProcessDef extends Closure {
 
     String getName() { name }
 
+    Path getScriptPath() { scriptPath }
+
     @Override
     int getMaximumNumberOfParameters() { return 0 }
 
@@ -72,18 +75,8 @@ class ProcessDef extends Closure {
     Class[] getParameterTypes() { EMPTY }
 
     @Override
-    Object call(final Object arg) {
-        call0(arg)
-    }
-
-    @Override
     Object call(final Object... args) {
         call0(args)
-    }
-
-    @Override
-    Object call() {
-        call0()
     }
 
     private call0(Object... args) {

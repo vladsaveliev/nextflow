@@ -20,6 +20,7 @@ import java.nio.file.Paths
 
 import groovy.transform.InheritConstructors
 import nextflow.script.BaseScript
+import nextflow.script.ProcessConfig
 import nextflow.script.ScriptBinding
 import nextflow.script.TaskBody
 import nextflow.util.BlankSeparatedList
@@ -68,11 +69,6 @@ class TaskContextTest extends Specification {
         result.getHolder() instanceof Map
         result.getHolder().get('alpha') == 1
 
-    }
-
-    @InheritConstructors
-    static class MockScript extends BaseScript {
-        @Override Object runScript() { return null }
     }
 
     def 'should dehydrate rehydrate'() {
@@ -142,5 +138,9 @@ class TaskContextTest extends Specification {
 
     }
 
+}
 
+@InheritConstructors
+class MockScript extends BaseScript {
+    @Override Object runScript() { return null }
 }

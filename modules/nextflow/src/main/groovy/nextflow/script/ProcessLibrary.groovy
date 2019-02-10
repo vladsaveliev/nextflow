@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-package nextflow.processor
+package nextflow.script
 
 import groovy.transform.CompileStatic
 import nextflow.Session
+import nextflow.exception.ProcessDuplicateException
 
 /**
  *
@@ -28,15 +29,34 @@ class ProcessLibrary {
 
     private Session session
 
-    private Map<String,ProcessDef> processDefs = [:]
+    private Map<String,ProcessDef> processDefs = new LinkedHashMap<>(50)
+
+    private Map<String,MethodDef> methodDefs = new LinkedHashMap<>(50)
 
     ProcessLibrary(Session session) {
         this.session = session
     }
 
     void register(ProcessDef process) {
+        checkDuplicate(process)
         processDefs.put(process.name, process)
-        session.binding.setVariable(process.name, process)
+    }
+
+    void register(MethodDef method) {
+        methodDefs.put(method.name, method)
+    }
+
+    private void checkDuplicate( ProcessDef process ) {
+
+        def other = processDefs[process.name]
+        if( other ) {
+            def message = """\
+                Process `$process.name` is defined in multiple library files:
+                  ${other.scriptPath.toUriString()}
+                  ${process.scriptPath.toUriString()}
+                """ .stripIndent()
+            throw new ProcessDuplicateException(message)
+        }
     }
 
 
@@ -51,6 +71,22 @@ class ProcessLibrary {
             aa[i+1] = args[i]
 
         proc.call(aa)
+    }
+
+    boolean contains(String name) {
+        methodDefs.containsKey(name) || processDefs.containsKey(name)
+    }
+
+    Object invoke(String name, Object[] args) {
+        def method = methodDefs[name]
+        if( method )
+            return method.invoke(args)
+
+        def proc = processDefs[name]
+        if( proc )
+            return proc.call(args)
+
+        throw new MissingMethodException(name, session.scriptClass)
     }
 
 }
