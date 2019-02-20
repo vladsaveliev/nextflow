@@ -41,7 +41,7 @@ class ExecutorFactory {
     /*
      * Map the executor class to its 'friendly' name
      */
-    final static Map BUILT_IN_EXECUTORS = [
+    final static Map<String, Class<? extends Executor>> BUILT_IN_EXECUTORS = [
             'nope': NopeExecutor,
             'local': LocalExecutor,
             'sge':  SgeExecutor,
@@ -59,7 +59,7 @@ class ExecutorFactory {
             'awsbatch': AwsBatchExecutor
     ]
 
-    @PackageScope Map executorsMap
+    @PackageScope Map<String, Class<? extends Executor>> executorsMap
 
     private Map<Class<? extends Executor>,? extends Executor> executors = new HashMap<>()
 

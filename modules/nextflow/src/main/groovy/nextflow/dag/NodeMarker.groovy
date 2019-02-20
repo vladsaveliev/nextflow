@@ -27,6 +27,7 @@ import nextflow.script.OutputsList
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@Deprecated
 @CompileStatic
 class NodeMarker {
 

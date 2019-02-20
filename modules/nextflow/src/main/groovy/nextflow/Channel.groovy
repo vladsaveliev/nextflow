@@ -18,6 +18,9 @@ package nextflow
 
 import java.util.concurrent.CompletableFuture
 
+import groovyx.gpars.dataflow.DataflowReadChannel
+import groovyx.gpars.dataflow.DataflowWriteChannel
+import nextflow.extension.ChannelHelper
 import static nextflow.util.CheckHelper.checkParams
 
 import java.nio.file.FileSystem
@@ -60,13 +63,15 @@ class Channel  {
     // only for testing purpose !
     private static CompletableFuture fromPath0Future
 
+
     /**
      * Create an new channel
      *
      * @return The channel instance
      */
-    static <T> DataflowChannel<T> create() {
-        new DataflowQueue<T>()
+    @Deprecated
+    static DataflowChannel create() {
+        new DataflowQueue()
     }
 
     /**
@@ -74,7 +79,7 @@ class Channel  {
      *
      * @return The channel instance
      */
-    static <T> DataflowChannel<T> empty() {
+    static DataflowChannel empty() {
         def result = new DataflowQueue()
         result.bind(STOP)
         NodeMarker.addSourceNode('Channel.empty', result)
@@ -324,7 +329,7 @@ class Channel  {
      * @return
      *      A channel emitting the file pairs matching the specified pattern(s)
      */
-    static DataflowChannel fromFilePairs(Map options = null, pattern) {
+    static DataflowWriteChannel fromFilePairs(Map options = null, pattern) {
         final allPatterns = pattern instanceof List ? pattern : [pattern]
         final allGrouping = new ArrayList(allPatterns.size())
         for( int i=0; i<allPatterns.size(); i++ ) {
@@ -356,7 +361,7 @@ class Channel  {
      * @return
      *      A channel emitting the file pairs matching the specified pattern(s)
      */
-    static DataflowChannel fromFilePairs(Map options = null, pattern, Closure grouping) {
+    static DataflowWriteChannel fromFilePairs(Map options = null, pattern, Closure grouping) {
         final allPatterns = pattern instanceof List ? pattern : [pattern]
         final allGrouping = new ArrayList(allPatterns.size())
         for( int i=0; i<allPatterns.size(); i++ ) {
@@ -368,7 +373,7 @@ class Channel  {
         return result
     }
 
-    private static DataflowChannel fromFilePairs0(Map options, List allPatterns, List<Closure> grouping) {
+    private static DataflowWriteChannel fromFilePairs0(Map options, List allPatterns, List<Closure> grouping) {
         assert allPatterns.size() == grouping.size()
         if( !allPatterns ) throw new AbortOperationException("Missing `fromFilePairs` parameter")
         if( !grouping ) throw new AbortOperationException("Missing `fromFilePairs` grouping parameter")
@@ -393,24 +398,31 @@ class Channel  {
             def prefix = grouping[index].call(path)
             return [ prefix, path ]
         }
-        def mapChannel = new MapOp(files, mapper).apply()
+        def mapChannel = (DataflowReadChannel)new MapOp(files, mapper)
+                            .setTarget(new DataflowQueue())
+                            .apply()
 
         // -- result the files having the same ID
         def DEF_SIZE = anyPattern ? 2 : 1
         def size = (options?.size ?: DEF_SIZE)
+        def isFlat = options?.flat == true
         def groupOpts = [sort: true, size: size]
-        def groupChannel = new GroupTupleOp(groupOpts, mapChannel).apply()
+        def groupChannel = isFlat ? new DataflowQueue<>() : ChannelHelper.create()
+
+        new GroupTupleOp(groupOpts, mapChannel)
+                .setTarget(groupChannel)
+                .apply()
 
         // -- flat the group resulting tuples
-        DataflowChannel result
-        if( options?.flat == true )  {
+        DataflowWriteChannel result
+        if( isFlat )  {
             def makeFlat = {  id, List items ->
                 def tuple = new ArrayList(items.size()+1);
                 tuple.add(id)
                 tuple.addAll(items)
                 return tuple
             }
-            result = new MapOp(groupChannel,makeFlat).apply()
+            result = new MapOp((DataflowReadChannel)groupChannel,makeFlat).apply()
         }
         else {
             result = groupChannel

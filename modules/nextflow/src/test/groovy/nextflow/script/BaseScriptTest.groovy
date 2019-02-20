@@ -21,15 +21,190 @@ import spock.lang.Specification
 import java.nio.file.Files
 
 import groovyx.gpars.dataflow.DataflowReadChannel
-import nextflow.exception.ProcessDuplicateException
+import nextflow.exception.DuplicateScriptDefinitionException
+import test.MockScriptRunner
 import test.TestHelper
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 class BaseScriptTest extends Specification {
 
+    def 'should invoke foreign functions - case 1' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        def alpha() {
+          return 'this is alpha result'
+        }   
+        
+        def bravo(x) { 
+          return x.reverse()
+        }
+        
+        def gamma(x,y) {
+          return "$x and $y"
+        }
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"
+   
+        def local_func() {
+          return "I'm local"
+        }
+   
+        ret1 = alpha()
+        ret2 = bravo('Hello')
+        ret3 = gamma('Hola', 'mundo')
+        ret4 = local_func()
+        """
+
+        when:
+        def runner = new MockScriptRunner()
+        def binding = runner.session.binding
+        def result = runner.setScript(SCRIPT).execute()
+
+        then:
+        binding.ret1 == 'this is alpha result'
+        binding.ret2 == 'olleH'
+        binding.ret3 == 'Hola and mundo'
+        binding.ret4 == "I'm local"
+        binding.ret4 == result
+    }
+
+    def 'should invoke a workflow from include - case 2.a.1' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
+          input: val data 
+          output: val result
+          exec:
+            result = "$data mundo"
+        }     
+        
+        process bar {
+            input: val data 
+            output: val result
+            exec: 
+              result = data.toUpperCase()
+        }   
+        
+        workflow alpha(data) {
+            foo(data)
+            bar(foo.output)
+        }
+        
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"
+   
+        alpha('Hello')
+        """
+
+        when:
+        def runner = new MockScriptRunner()
+        def binding = runner.session.binding
+        def result = runner.setScript(SCRIPT).execute()
+
+        then:
+        result.val == 'HELLO MUNDO'
+        binding.hasVariable('alpha')
+    }
+
+
+    def 'should invoke a workflow from main - case 2.a.2' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
+          input: val data 
+          output: val result
+          exec:
+            result = "$data mundo"
+        }     
+        
+        process bar {
+            input: val data 
+            output: val result
+            exec: 
+              result = data.toUpperCase()
+        }   
+        
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"      
+
+        workflow alpha(data) {
+            foo(data)
+            bar(foo.output)
+        }
+   
+        alpha('Hello')
+        """
+
+        when:
+        def runner = new MockScriptRunner()
+        def binding = runner.session.binding
+        def result = runner.setScript(SCRIPT).execute()
+
+        then:
+        result.val == 'HELLO MUNDO'
+        binding.hasVariable('alpha')
+    }
+
+    def 'should invoke an anonymous workflow' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
+          input: val data 
+          output: val result
+          exec:
+            result = "$data mundo"
+        }     
+        
+        process bar {
+            input: val data 
+            output: val result
+            exec: 
+              result = data.toUpperCase()
+        }   
+        
+        '''
+
+        SCRIPT.text = """
+        require "$MODULE"
+   
+        data = 'Hello'
+        workflow {
+            foo(data)
+            bar(foo.output)
+        }
+        """
+
+        when:
+        def runner = new MockScriptRunner()
+        def result = runner.setScript(SCRIPT).execute()
+
+        then:
+        result.val == 'HELLO MUNDO'
+    }
 
     def 'should define a process and invoke it' () {
         given:
@@ -49,11 +224,14 @@ class BaseScriptTest extends Specification {
         SCRIPT.text = """
         require "$MODULE"
         hello_ch = Channel.from('world')
-        foo(hello_ch)
+        
+        workflow {
+            foo(hello_ch)
+        }
         """
 
         when:
-        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def runner = new MockScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -85,14 +263,15 @@ class BaseScriptTest extends Specification {
         SCRIPT.text = """
         require 'module.nf'
 
-        ch1 = Channel.from('world')
-        ch2 = Channel.value(['x', '/some/file'])
-        
-        foo(ch1, ch2)
+        workflow {
+            ch1 = Channel.from('world')
+            ch2 = Channel.value(['x', '/some/file'])
+            foo(ch1, ch2)
+        }
         """
 
         when:
-        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def runner = new MockScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -100,36 +279,7 @@ class BaseScriptTest extends Specification {
         result.val == 'echo sample=world pairId=x reads=/some/file'
     }
 
-    def 'should define and invoke as an operator' () {
-        given:
-        def folder = TestHelper.createInMemTempDir()
-        def MODULE = folder.resolve('module.nf')
-        def SCRIPT = folder.resolve('main.nf')
-
-        MODULE.text = '''
-        process foo {
-          input: val sample
-          output: stdout() 
-          script:
-          /echo Hello $sample/
-        }
-        '''
-
-        SCRIPT.text = """
-        require 'module.nf'
-
-        Channel.from('world').foo()
-        """
-
-        when:
-        def runner = new TestScriptRunner([process:[executor:'nope']])
-        def result = runner.setScript(SCRIPT).execute()
-        then:
-        noExceptionThrown()
-        result instanceof DataflowReadChannel
-        result.val == 'echo Hello world'
-
-    }
+    
 
     def 'should compose processes' () {
 
@@ -165,9 +315,12 @@ class BaseScriptTest extends Specification {
         when:
         SCRIPT.text = """
         require 'module.nf'        
-        bar(foo('Ciao'))
+
+        workflow {
+            bar(foo('Ciao'))
+        }
         """
-        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def runner = new MockScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -178,9 +331,12 @@ class BaseScriptTest extends Specification {
         when:
         SCRIPT.text = """
         require 'module.nf'        
-        (ch0, ch1) = foo('Ciao')
+        
+        workflow {
+          (ch0, ch1) = foo('Ciao')
+        }
         """
-        runner = new TestScriptRunner([process:[executor:'nope']])
+        runner = new MockScriptRunner()
         result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -210,11 +366,14 @@ class BaseScriptTest extends Specification {
         // and invoke the process 'foo'
         SCRIPT.text = """ 
         require "module.nf", params:[foo:'Hello', bar: 'world']
-        foo()
+            
+        workflow { 
+            foo() 
+        }
         """
 
         when:
-        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def runner = new MockScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()
@@ -242,19 +401,22 @@ class BaseScriptTest extends Specification {
         SCRIPT.text = """ 
         require 'lib1.nf'
         require 'lib2.nf'
-        foo()
+
+        workflow {
+            foo()
+        }
         """
 
         when:
-        new TestScriptRunner([process:[executor:'nope']])
+        new MockScriptRunner()
                 .setScript(SCRIPT)
                 .execute()
         then:
-        def err = thrown(ProcessDuplicateException)
+        def err = thrown(DuplicateScriptDefinitionException)
         err.message == """\
-            Process `foo` is defined in multiple library files:
-              ${LIB1.toUriString()}
-              ${LIB2.toUriString()}
+            Duplicate definition `foo` in the following scripts:
+            - ${LIB2.toUriString()}
+            - ${LIB1.toUriString()}
             """.stripIndent()
 
     }
@@ -308,11 +470,13 @@ class BaseScriptTest extends Specification {
 
         SCRIPT.text = """
         require 'module.nf', params:[x: 'Hola mundo']
-        return foo()
+        workflow {
+            return foo()
+        }    
         """
 
         when:
-        def runner = new TestScriptRunner([process:[executor:'nope']])
+        def runner = new MockScriptRunner()
         def result = runner.setScript(SCRIPT).execute()
         then:
         noExceptionThrown()

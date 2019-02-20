@@ -50,6 +50,7 @@ class DataflowHelper {
      * @param source
      * @return
      */
+    @Deprecated
     static <V> DataflowChannel<V> newChannelBy(DataflowReadChannel<?> source) {
 
         switch( source ) {
@@ -90,7 +91,7 @@ class DataflowHelper {
     static DEF_ERROR_LISTENER = new DataflowEventAdapter() {
         @Override
         public boolean onException(final DataflowProcessor processor, final Throwable e) {
-            DataflowExtensions.log.error("@unknown", e)
+            DataflowEx.log.error("@unknown", e)
             session.abort(e)
             return true;
         }
@@ -210,7 +211,7 @@ class DataflowHelper {
      * @param closure
      * @return
      */
-    static final <V> DataflowProcessor subscribeImpl(final DataflowReadChannel<V> source, final Map<String,Closure> events ) {
+    static final DataflowProcessor subscribeImpl(final DataflowReadChannel source, final Map<String,Closure> events ) {
         checkSubscribeHandlers(events)
 
         def error = false
@@ -224,7 +225,7 @@ class DataflowHelper {
                     events.onComplete.call(processor)
                 }
                 catch( Exception e ) {
-                    DataflowExtensions.log.error("@unknown", e)
+                    DataflowEx.log.error("@unknown", e)
                     session.abort(e)
                 }
             }
@@ -260,13 +261,13 @@ class DataflowHelper {
     }
 
 
-    static <V> DataflowProcessor chainImpl(final DataflowReadChannel<?> source, final DataflowReadChannel<V> target, final Map params, final Closure<V> closure) {
+    static DataflowProcessor chainImpl(final DataflowReadChannel source, final DataflowWriteChannel target, final Map params, final Closure closure) {
 
         final Map<String, Object> parameters = new HashMap<String, Object>(params)
         parameters.put("inputs", asList(source))
         parameters.put("outputs", asList(target))
 
-        newOperator(parameters, new ChainWithClosure<V>(closure))
+        newOperator(parameters, new ChainWithClosure(closure))
     }
 
     /**
@@ -277,7 +278,7 @@ class DataflowHelper {
      * @param closure
      * @return
      */
-    static <V> DataflowProcessor reduceImpl(final DataflowReadChannel<?> channel, final DataflowVariable result, def seed, final Closure<V> closure) {
+    static DataflowProcessor reduceImpl(final DataflowReadChannel channel, final DataflowVariable result, def seed, final Closure closure) {
 
         // the *accumulator* value
         def accum = seed
@@ -287,7 +288,7 @@ class DataflowHelper {
             /*
              * call the passed closure each time
              */
-            public void afterRun(final DataflowProcessor processor, final List<Object> messages) {
+            void afterRun(final DataflowProcessor processor, final List<Object> messages) {
                 final item = messages.get(0)
                 final value = accum == null ? item : closure.call(accum, item)
 
@@ -305,18 +306,18 @@ class DataflowHelper {
             /*
              * when terminates bind the result value
              */
-            public void afterStop(final DataflowProcessor processor) {
+            void afterStop(final DataflowProcessor processor) {
                 result.bind(accum)
             }
 
-            public boolean onException(final DataflowProcessor processor, final Throwable e) {
+            boolean onException(final DataflowProcessor processor, final Throwable e) {
                 log.error("@unknown", e)
                 session.abort(e)
                 return true;
             }
         }
 
-        chainImpl(channel, new DataflowQueue(), [listeners: [listener]], {true})
+        chainImpl(channel, ChannelHelper.create(), [listeners: [listener]], {true})
     }
 
 
@@ -356,4 +357,10 @@ class DataflowHelper {
         }
     }
 
+    static Map<String,Closure> eventsMap(Closure onNext, Closure onComplete) {
+        def result = new HashMap<String,Closure>(2)
+        result.put('onNext', onNext)
+        result.put('onComplete', onComplete)
+        return result
+    }
 }

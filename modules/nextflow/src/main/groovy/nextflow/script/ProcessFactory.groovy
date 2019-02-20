@@ -166,7 +166,7 @@ class ProcessFactory {
         // apply config settings to the process
         applyConfig(name, processConfig)
 
-        new ProcessDef(owner, name, this, processConfig.clone(), script)
+        new ProcessDef(owner, name, processConfig, script)
     }
 
 

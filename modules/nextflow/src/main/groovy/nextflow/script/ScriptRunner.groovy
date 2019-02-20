@@ -215,6 +215,9 @@ class ScriptRunner {
 
     protected void parseScript( ScriptFile scriptFile ) {
         scriptParser = new ScriptParser(session).parse(scriptFile.main)
+        session.script = scriptParser.script
+        session.scriptClass = scriptParser.script.getClass()
+        session.scriptClassName = scriptParser.script.getClass().getName()
     }
 
     /**
@@ -226,7 +229,8 @@ class ScriptRunner {
     }
 
     @PackageScope void checkConfig() {
-        session.validateConfig(scriptObj.getProcessNames())
+        final names = ScriptMeta.get(scriptParser.script).getProcessNames()
+        session.validateConfig(names)
     }
 
     @PackageScope VersionNumber getCurrentVersion() {

@@ -63,6 +63,4 @@ interface ISession {
 
     boolean isResumeMode()
 
-    Object invokeLibraryMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD)
-
 }

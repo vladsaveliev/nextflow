@@ -16,96 +16,94 @@
 
 package nextflow.script
 
-import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
 import nextflow.Session
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class ProcessDef extends Closure {
+class ProcessDef implements InvokableDef, Cloneable {
 
-    private static Class[] EMPTY = []
+    private BaseScript owner
 
     private String name
-
-    private ProcessFactory processFactory
 
     private ProcessConfig processConfig
 
     private TaskBody taskBody
 
-    private InputsList inputs
-
-    private OutputsList outputs
-
     private Session session
 
-    private Path scriptPath
+    private Object output
 
-    ProcessDef(BaseScript owner, String name, ProcessFactory factory, ProcessConfig config, TaskBody body) {
-        super(owner)
+    ProcessDef(BaseScript owner, String name, ProcessConfig config, TaskBody body) {
+        this.owner = owner
         this.name = name
-        this.processFactory = factory
-        this.processConfig = config
         this.taskBody = body
-        this.inputs = config.getInputs()
-        this.outputs = config.getOutputs()
+        this.processConfig = config
         this.session = owner.binding.session
-        this.scriptPath = owner.binding.scriptPath
     }
 
-    BaseScript getOwner() {
-        return (BaseScript)super.getOwner()
+    ProcessDef clone() {
+        def result = (ProcessDef)super.clone()
+        result.@taskBody = taskBody.clone()
+        result.@processConfig = processConfig.clone()
+        return result
     }
+
+    private InputsList getDeclaredInputs() { processConfig.getInputs() }
+
+    private OutputsList getDeclaredOutputs() { processConfig.getOutputs() }
+
+    BaseScript getOwner() { owner }
 
     String getName() { name }
 
-    Path getScriptPath() { scriptPath }
+    def getOutput() { output }
 
-    @Override
-    int getMaximumNumberOfParameters() { return 0 }
-
-    @Override
-    Class[] getParameterTypes() { EMPTY }
-
-    @Override
-    Object call(final Object... args) {
-        call0(args)
+    Object invoke(Object[] args, Binding scope) {
+        // use this instance an workflow template, therefore clone it
+        def process = this.clone()
+        // invoke the process execution
+        def result = process.call0(args)
+        // register this workflow invocation in the current context
+        // so that it can be accessed in the outer execution scope
+        scope.setProperty(name, process)
+        return result
     }
 
-    private call0(Object... args) {
+
+    private call0(Object[] args) {
         if( args.size()==1 && args[0] instanceof ProcessOutputArray )
             args = args[0] as Object[]
-        
+
         // sanity check
-        if( args.size() != inputs.size() )
-            throw new IllegalArgumentException("Process `$name` declares ${inputs.size()} input channels but ${args.size()} were specified")
+        if( args.size() != declaredInputs.size() )
+            throw new IllegalArgumentException("Process `$name` declares ${declaredInputs.size()} input channels but ${args.size()} were specified")
 
         // set input channels
         for( int i=0; i<args.size(); i++ ) {
-            inputs[i].from(args[i])
+            declaredInputs[i].from(args[i])
         }
 
         // set output channels
         // note: the result object must be an array instead of a List to allow process
         // composition ie. to use the process output as the input in another process invocation
         List result = null
-        if( outputs.size() ) {
-            result = new ArrayList<>(outputs.size())
-            final allScalarValues = inputs.allScalarInputs()
-            final hasEachParams = inputs.any { it instanceof EachInParam }
+        if( declaredOutputs.size() ) {
+            result = new ArrayList<>(declaredOutputs.size())
+            final allScalarValues = declaredInputs.allScalarInputs()
+            final hasEachParams = declaredInputs.any { it instanceof EachInParam }
             final singleton = allScalarValues && !hasEachParams
 
-            for( int i=0; i<outputs.size(); i++ ) {
+            for(int i=0; i<declaredOutputs.size(); i++ ) {
                 def ch = singleton ? new DataflowVariable<>() : new DataflowQueue<>()
                 result[i] = ch
-                outputs[i].into(ch)
+                declaredOutputs[i].into(ch)
             }
         }
 
@@ -114,18 +112,19 @@ class ProcessDef extends Closure {
                 .executorFactory
                 .getExecutor(name, processConfig, taskBody, session)
 
-        //create processor class
-        processFactory
+        // create processor class
+        session
+                .newProcessFactory(owner)
                 .newTaskProcessor(name, executor, processConfig, taskBody)
                 .run()
 
         // the result object
         if( !result )
-            return null
-        if( result.size()==1 )
-            return result[0]
-        else
-            return new ProcessOutputArray(result)
+            return output=null
 
+        return output = (result.size()==1
+                ? output=result[0]
+                : new ProcessOutputArray(result))
     }
+
 }

@@ -15,25 +15,59 @@
  */
 
 package nextflow.extension
-import java.nio.file.Paths
 
-import groovyx.gpars.dataflow.DataflowVariable
-import nextflow.Channel
-import nextflow.Session
 import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Timeout
+
+import java.nio.file.Paths
+
+import groovyx.gpars.dataflow.DataflowBroadcast
+import groovyx.gpars.dataflow.DataflowQueue
+import groovyx.gpars.dataflow.DataflowReadChannel
+import groovyx.gpars.dataflow.DataflowVariable
+import nextflow.Channel
+import nextflow.Session
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Timeout(10)
-class DataflowExtensionsTest extends Specification {
+class DataflowExtTest extends Specification {
 
     def setupSpec() {
         new Session()
     }
 
+    def 'should check dataflow read channel' () {
+        expect:
+        DataflowEx.isReadChannel(DataflowVariable.class)
+        DataflowEx.isReadChannel(DataflowQueue.class)
+        !DataflowEx.isReadChannel(DataflowBroadcast.class)
+    }
+
+    def 'should check extension method' () {
+        given:
+        def ext = new DataflowEx()
+        expect:
+        ext.isExtension(new DataflowVariable(), 'map')
+        ext.isExtension(new DataflowVariable(), 'flatMap')
+        !ext.isExtension(new DataflowVariable(), 'foo')
+    }
+
+    def 'should invoke ext method' () {
+        given:
+        def ext = new DataflowEx()
+        def ch = new DataflowQueue(); ch<<1<<2<<3
+
+        when:
+        def result = ext.invokeMethod(ch, 'map', { it -> it * it })
+        then:
+        result instanceof DataflowReadChannel
+        result.val == 1
+        result.val == 4
+        result.val == 9 
+    }
 
     def testFilter() {
 
@@ -926,38 +960,38 @@ class DataflowExtensionsTest extends Specification {
     def testDefaultMappingClosure() {
 
         expect:
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [7,8,9] ) == 7
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [7,8,9], 2 ) == 9
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [] ) == null
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [], 2 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [7, 8, 9] ) == 7
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [7, 8, 9], 2 ) == 9
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [] ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [], 2 ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [7,8,9] as Object[] ) == 7
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [7,8,9] as Object[], 1 ) == 8
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( ['alpha','beta'] as String[] ) == 'alpha'
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( ['alpha','beta'] as String[], 1 ) == 'beta'
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [7, 8, 9] as Object[] ) == 7
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [7, 8, 9] as Object[], 1 ) == 8
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( ['alpha', 'beta'] as String[] ) == 'alpha'
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( ['alpha', 'beta'] as String[], 1 ) == 'beta'
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [ 6,7,8,9 ] as LinkedHashSet ) == 6
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [ 6,7,8,9 ] as LinkedHashSet, 1 ) == 7
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [ 6,7,8,9 ] as LinkedHashSet, 2 ) == 8
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [ 6,7,8,9 ] as LinkedHashSet, 5 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [6, 7, 8, 9 ] as LinkedHashSet ) == 6
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [6, 7, 8, 9 ] as LinkedHashSet, 1 ) == 7
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [6, 7, 8, 9 ] as LinkedHashSet, 2 ) == 8
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [6, 7, 8, 9 ] as LinkedHashSet, 5 ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9] ) == 1
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 1 ) == 2
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 2 ) == 9
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 3 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9] ) == 1
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 1 ) == 2
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 2 ) == 9
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9], 3 ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0) ) == 'a'
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0), 1 ) == 1
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0), 2 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0) ) == 'a'
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0), 1 ) == 1
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(0), 2 ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1) ) == 'b'
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1), 1 ) == 2
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1), 2 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1) ) == 'b'
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1), 1 ) == 2
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [a:1, b:2, z:9].entrySet().getAt(1), 2 ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( [:] ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( [:] ) == null
 
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( 99 ) == 99
-        DataflowExtensions.DEFAULT_MAPPING_CLOSURE.call( 99, 2 ) == null
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( 99 ) == 99
+        DataflowEx.DEFAULT_MAPPING_CLOSURE.call( 99, 2 ) == null
 
     }
 
@@ -1306,32 +1340,6 @@ class DataflowExtensionsTest extends Specification {
 
     }
 
-    def 'should close the dataflow channel' () {
-
-        when:
-        def source = Channel.create()
-        source << 10
-        source << 20
-        source << 30
-        def result = source.close()
-        then:
-        result.is source
-        result.val == 10
-        result.val == 20
-        result.val == 30
-        result.val == Channel.STOP
-
-        when:
-        source = Channel.value().close()
-        then:
-        source.val == Channel.STOP
-
-        when:
-        source = Channel.value(1).close()
-        then:
-        source.val == 1
-
-    }
 
     def 'should assign a channel to new variable' () {
         given:

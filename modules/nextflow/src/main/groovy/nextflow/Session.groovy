@@ -48,7 +48,6 @@ import nextflow.processor.TaskFault
 import nextflow.processor.TaskHandler
 import nextflow.processor.TaskProcessor
 import nextflow.script.BaseScript
-import nextflow.script.CurrentScript
 import nextflow.script.ProcessConfig
 import nextflow.script.ProcessFactory
 import nextflow.script.ScriptBinding
@@ -198,7 +197,7 @@ class Session implements ISession {
 
     private int poolSize
 
-    private List<TraceObserver> observers
+    private List<TraceObserver> observers = Collections.emptyList()
 
     private Closure errorAction
 
@@ -1255,14 +1254,6 @@ class Session implements ISession {
         Method find = ClassLoader.class.getDeclaredMethod("findLoadedClass", [String.class] as Class[] );
         find.setAccessible(true)
         return find.invoke(ClassLoader.getSystemClassLoader(), className)
-    }
-
-    Object invokeLibraryMethod(Object channel, String methodName, Object[] args, Throwable MISSING_METHOD) {
-        def current = CurrentScript.get()
-        if( current.main )
-            current.library.invoke(channel,methodName,args,MISSING_METHOD)
-        else
-            throw MISSING_METHOD
     }
 
 }

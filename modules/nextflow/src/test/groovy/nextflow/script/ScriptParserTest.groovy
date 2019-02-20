@@ -36,10 +36,6 @@ class ScriptParserTest extends Specification {
         parser.binding.module == false
         parser.binding.session == session
         !session.binding.hasVariable('bar')
-        // session attrs
-        session.script == parser.script
-        session.scriptClass == parser.script.class
-        session.scriptClassName == parser.script.class.simpleName
     }
 
     def 'should run a text script' () {
@@ -116,26 +112,5 @@ class ScriptParserTest extends Specification {
         result == 'Script_01af1441'
     }
 
-    def 'should find declared methods' () {
-
-        given:
-        def session = new Session()
-        def parser = new ScriptParser(session)
-        def binding = new ScriptBinding(params:[foo:'Hello'])
-
-        def file = TestHelper.createInMemTempFile('foo.nf')
-        file.text = '''
-        def foo() { print 1 }
-        def bar() { print 2 } 
-        private baz() { println 3 }
-        '''
-
-        when:
-        parser.setBinding(binding)
-        parser.runScript(file)
-        then:
-        parser.getDefinedMethods().collect{it.method.name} as Set == ['foo','bar'] as Set 
-
-    }
 
 }

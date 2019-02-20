@@ -19,7 +19,8 @@ package nextflow.dag
 import groovy.transform.PackageScope
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
-import groovyx.gpars.dataflow.DataflowChannel
+import groovyx.gpars.dataflow.DataflowReadChannel
+import groovyx.gpars.dataflow.DataflowWriteChannel
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.Session
@@ -214,7 +215,7 @@ class DAG {
 
         inputs
                 .findAll { !( it instanceof DefaultInParam)  }
-                .collect { InParam p -> new ChannelHandler(channel: (DataflowChannel)p.inChannel, label: inputName0(p)) }
+                .collect { InParam p -> new ChannelHandler(channel: p.inChannel, label: inputName0(p)) }
 
     }
 
@@ -230,7 +231,7 @@ class DAG {
         outputs.each { OutParam p ->
             if( p instanceof DefaultOutParam ) return
             p.outChannels.each {
-                result << new ChannelHandler(channel: (DataflowChannel)it, label: p instanceof SetOutParam ? null : p.name)
+                result << new ChannelHandler(channel: it, label: p instanceof SetOutParam ? null : p.name)
             }
         }
 
@@ -241,11 +242,11 @@ class DAG {
         if( entry == null ) {
             Collections.emptyList()
         }
-        else if( entry instanceof DataflowChannel ) {
+        else if( entry instanceof DataflowReadChannel || entry instanceof DataflowWriteChannel ) {
             [ new ChannelHandler(channel: entry) ]
         }
         else if( entry instanceof Collection || entry instanceof Object[] ) {
-            entry.collect { new ChannelHandler(channel: (DataflowChannel)it) }
+            entry.collect { new ChannelHandler(channel: it) }
         }
         else {
             throw new IllegalArgumentException("Not a valid channel type: [${entry.class.name}]")
@@ -253,7 +254,7 @@ class DAG {
     }
 
     @PackageScope
-    Edge findEdge( DataflowChannel channel ) {
+    Edge findEdge( channel ) {
         edges.find { edge -> edge.channel.is(channel) }
     }
 
@@ -292,7 +293,7 @@ class DAG {
 
 
     @PackageScope
-    String resolveChannelName( Map map, DataflowChannel channel ) {
+    String resolveChannelName( Map map, channel ) {
         def entry = map.find { k,v -> v.is channel }
         return entry ? entry.key : null
     }
@@ -409,9 +410,9 @@ class DAG {
     class Edge {
 
         /**
-         * The {@link groovyx.gpars.dataflow.DataflowChannel} that originated this graph edge
+         * The Dataflow channel that originated this graph edge
          */
-        DataflowChannel channel
+        Object channel
 
         /**
          * The vertex *from* where the edge starts
@@ -439,7 +440,7 @@ class DAG {
         /**
          * The {@link groovyx.gpars.dataflow.DataflowChannel} that originated this graph edge
          */
-        DataflowChannel channel
+        Object channel
 
         /**
          * The edge label

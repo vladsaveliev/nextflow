@@ -27,8 +27,8 @@ import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import nextflow.Nextflow
 import nextflow.exception.ProcessException
+import nextflow.extension.ChannelHelper
 import nextflow.extension.ToListOp
-
 /**
  * Base class for input/output parameters
  *
@@ -185,12 +185,13 @@ abstract class BaseInParam extends BaseParam implements InParam {
     protected DataflowReadChannel inputValToChannel( value ) {
         checkFromNotNull(value)
 
-        if ( value instanceof DataflowBroadcast )  {
-            return value.createReadChannel()
+        if( this instanceof DefaultInParam ) {
+            assert value instanceof DataflowQueue
+            return value
         }
 
-        if( value instanceof DataflowReadChannel ) {
-            return value
+        if ( value instanceof DataflowReadChannel || value instanceof DataflowBroadcast )  {
+            return ChannelHelper.get(value)
         }
 
         // wrap any collections with a DataflowQueue
@@ -506,7 +507,7 @@ class SetInParam extends BaseInParam {
 
     SetInParam bind( Object... obj ) {
 
-        obj.each { item ->
+        for( def item : obj ) {
 
             if( item instanceof TokenVar )
                 newItem(ValueInParam).bind(item)
@@ -594,7 +595,7 @@ class InputsList implements List<InParam>, Cloneable {
 
     boolean allScalarInputs() {
         for( InParam param : target ) {
-            if( param.inChannel instanceof DataflowQueue )
+            if( param.inChannel.isChannelQueue() )
                 return false
         }
         return true

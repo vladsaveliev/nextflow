@@ -38,7 +38,7 @@ class TaskBodyTest extends Specification {
         'exec'      | ScriptType.GROOVY     | false
         'script'    | ScriptType.SCRIPTLET  | false
         'shell'     | ScriptType.SCRIPTLET  | true
-
+        'workflow'  | ScriptType.GROOVY     | false
     }
 
 
@@ -51,6 +51,12 @@ class TaskBodyTest extends Specification {
 
     }
 
+    def 'should return empty set'() {
+        when:
+        def body = new TaskBody({->'echo foo'}, 'echo foo')
+        then:
+        body.getValNames() == [] as Set
+    }
 
     def 'should return variable names referenced in task body'( ) {
 

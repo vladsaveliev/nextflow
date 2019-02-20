@@ -15,15 +15,16 @@
  */
 
 package nextflow.script
+
 import java.nio.file.Path
 
 import groovy.transform.InheritConstructors
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.DataflowQueue
-import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.exception.IllegalFileException
+import nextflow.extension.ChannelHelper
 import nextflow.file.FilePatternSplitter
 import nextflow.util.BlankSeparatedList
 /**
@@ -173,7 +174,7 @@ abstract class BaseOutParam extends BaseParam implements OutParam {
                 }
 
                 // instantiate the new channel
-                channel = singleton && mode==BasicMode.standard ? new DataflowVariable() : new DataflowQueue()
+                channel = ChannelHelper.create( singleton && mode==BasicMode.standard )
 
                 // bind it to the script on-fly
                 if( local != '-' && binding ) {
