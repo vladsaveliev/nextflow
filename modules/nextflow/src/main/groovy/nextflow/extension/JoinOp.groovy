@@ -27,7 +27,7 @@ import nextflow.Channel
 import nextflow.util.CheckHelper
 import static nextflow.extension.DataflowHelper.addToList
 /**
- * Implements {@link DataflowEx#join} operator logic
+ * Implements {@link OperatorEx#join} operator logic
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */

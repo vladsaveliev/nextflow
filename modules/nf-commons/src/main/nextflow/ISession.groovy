@@ -17,6 +17,7 @@
 package nextflow
 
 import java.nio.file.Path
+
 /**
  * Nextflow session interface
  *

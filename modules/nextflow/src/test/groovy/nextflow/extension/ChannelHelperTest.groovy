@@ -49,4 +49,13 @@ class ChannelHelperTest extends Specification {
         !ChannelHelper.isChannelQueue('hello')
     }
 
+    def 'should validate allScalar method' () {
+
+        expect:
+        ChannelHelper.allScalar([1])
+        ChannelHelper.allScalar([1,2,3])
+        !ChannelHelper.allScalar([new DataflowVariable(), new DataflowQueue()])
+        !ChannelHelper.allScalar([new DataflowQueue(), new DataflowQueue()])
+    }
+
 }

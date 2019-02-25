@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import groovy.lang.MetaClass;
 import groovyx.gpars.dataflow.DataflowReadChannel;
 import groovyx.gpars.dataflow.DataflowWriteChannel;
-import nextflow.extension.DataflowEx;
+import nextflow.extension.OperatorEx;
 import nextflow.file.FileHelper;
 
 /**
@@ -36,12 +36,6 @@ public class NextflowDelegatingMetaClass extends groovy.lang.DelegatingMetaClass
 
     public NextflowDelegatingMetaClass(MetaClass delegate) {
         super(delegate);
-    }
-
-    private final DataflowEx dataflowExt;
-
-    {
-        dataflowExt = new DataflowEx();
     }
 
     @Override
@@ -61,18 +55,11 @@ public class NextflowDelegatingMetaClass extends groovy.lang.DelegatingMetaClass
             if( obj instanceof Path )
                 return FileHelper.empty((Path)obj);
         }
-        else if( len>0 && isInto(methodName, obj, args) ) {
-            DataflowWriteChannel[] target = new DataflowWriteChannel[len];
-            System.arraycopy(args,0,target,0,len);
-            dataflowExt.into((DataflowReadChannel) obj, target);
-            return null;
-        }
-        else if( dataflowExt.isExtension(obj,methodName) ) {
-            return dataflowExt.invokeMethod(obj, methodName, args);
+        else if( OperatorEx.instance.isExtension(obj,methodName) ) {
+            return OperatorEx.instance.invokeOperator(obj, methodName, args);
         }
 
         return delegate.invokeMethod(obj, methodName, args);
-
     }
 
 

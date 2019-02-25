@@ -16,9 +16,6 @@
 
 package nextflow.script
 
-import nextflow.Session
-import nextflow.config.Manifest
-
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -26,11 +23,12 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
-import nextflow.Const
+import nextflow.NextflowMeta
+import nextflow.Session
 import nextflow.config.ConfigBuilder
+import nextflow.config.Manifest
 import nextflow.trace.WorkflowStats
 import nextflow.util.Duration
-import nextflow.util.VersionNumber
 import org.codehaus.groovy.runtime.InvokerHelper
 /**
  * Models workflow metadata properties and notification handler
@@ -110,7 +108,7 @@ class WorkflowMetadata {
      * <li>build: runtime build number
      * <li>timestamp: runtime compile timestamp
      */
-    Map nextflow
+    NextflowMeta nextflow
 
     /**
      * Reports if the execution completed successfully
@@ -215,7 +213,7 @@ class WorkflowMetadata {
         this.start = new Date()
         this.container = session.fetchContainers()
         this.commandLine = session.commandLine
-        this.nextflow = [version: new VersionNumber(Const.APP_VER), build: Const.APP_BUILDNUM, timestamp: Const.APP_TIMESTAMP_UTC]
+        this.nextflow = NextflowMeta.instance
         this.workDir = session.workDir
         this.launchDir = Paths.get('.').complete()
         this.profile = session.profile ?:  ConfigBuilder.DEFAULT_PROFILE

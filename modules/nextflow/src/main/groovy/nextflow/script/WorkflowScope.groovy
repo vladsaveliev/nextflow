@@ -12,7 +12,7 @@ class WorkflowScope {
 
     static WorkflowScope get() { INSTANCE }
 
-    private List<WorkflowDef> stack = new ArrayList<>()
+    private List<WorkflowDef> stack = new ArrayList<>(10)
 
     private WorkflowDef last
 

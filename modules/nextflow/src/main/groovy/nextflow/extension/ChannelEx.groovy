@@ -16,6 +16,9 @@
 
 package nextflow.extension
 
+import groovy.transform.CompileDynamic
+import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import groovyx.gpars.agent.Agent
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
@@ -23,10 +26,16 @@ import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
 import nextflow.Global
 import nextflow.dag.NodeMarker
+import nextflow.script.ComponentDef
+import nextflow.script.ParallelDef
+import nextflow.script.WorkflowDef
+import nextflow.script.WorkflowScope
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@Slf4j
+@CompileStatic
 class ChannelEx {
 
     static boolean isChannelQueue(DataflowReadChannel ch) {
@@ -45,7 +54,7 @@ class ChannelEx {
      * @param DataflowReadChannel
      * @param holder A closure that must define a single variable expression
      */
-    static void set(DataflowWriteChannel source, Closure holder ) {
+    static void set(DataflowWriteChannel source, Closure holder) {
         final name = CaptureProperties.capture(holder)
         if( !name )
             throw new IllegalArgumentException("Missing name to which set the channel variable")
@@ -95,7 +104,8 @@ class ChannelEx {
      */
     @Deprecated
     static DataflowWriteChannel close(DataflowWriteChannel source) {
-        return DataflowEx.close0(source)
+        log.warn "The `close` operator is deprecated -- it will be removed in a future release"
+        return ChannelHelper.close0(source)
     }
 
     /**
@@ -105,6 +115,7 @@ class ChannelEx {
      * the {@code Agent#updateValue} method
      *
      */
+    @CompileDynamic
     static void update(Agent self, Closure message ) {
         assert message != null
 
@@ -114,4 +125,26 @@ class ChannelEx {
         }
 
     }
+
+    static private WorkflowDef checkScope() {
+        def scope = WorkflowScope.get().current()
+        if( scope == null ) throw new IllegalArgumentException("Process invocation are only allowed within a workflow context")
+        return scope
+    }
+
+    static Object rightShift( DataflowWriteChannel left, ComponentDef right ) {
+        def scope = checkScope()
+        return right.invoke(left, scope.context)
+    }
+
+    static ParallelDef or(ComponentDef def1, ComponentDef def2) {
+        checkScope()
+        return new ParallelDef().add(def1).add(def2)
+    }
+
+    static or(ParallelDef def1, ComponentDef def2) {
+        checkScope()
+        def1.add(def2)
+    }
+
 }

@@ -128,6 +128,8 @@ interface InParam {
 
     DataflowReadChannel getInChannel()
 
+    Object getRawChannel()
+
     InParam from( Object value )
 
     InParam from( Object... values )
@@ -191,7 +193,7 @@ abstract class BaseInParam extends BaseParam implements InParam {
         }
 
         if ( value instanceof DataflowReadChannel || value instanceof DataflowBroadcast )  {
-            return ChannelHelper.get(value)
+            return ChannelHelper.getReadable(value)
         }
 
         // wrap any collections with a DataflowQueue
@@ -283,6 +285,14 @@ abstract class BaseInParam extends BaseParam implements InParam {
         checkFromNotNull(obj)
         fromObject = obj
         return this
+    }
+
+    Object getRawChannel() {
+        if( ChannelHelper.isChannel(fromObject) )
+            return fromObject
+        if( ChannelHelper.isChannel(inChannel) )
+            return inChannel
+        throw new IllegalStateException("Missing input channel")
     }
 
     BaseInParam from( Object... obj ) {

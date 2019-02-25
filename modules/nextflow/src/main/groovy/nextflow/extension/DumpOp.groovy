@@ -54,7 +54,7 @@ class DumpOp {
     }
 
     DumpOp setSource( DataflowWriteChannel source ) {
-        this.source = ChannelHelper.get(source)
+        this.source = ChannelHelper.getReadable(source)
         return this
     }
 
@@ -89,7 +89,7 @@ class DumpOp {
             target.bind(it)
         }
 
-        events.onComplete = { DataflowEx.close0(target) }
+        events.onComplete = { ChannelHelper.close0(target) }
 
         DataflowHelper.subscribeImpl(source, events)
         return target

@@ -31,7 +31,7 @@ import nextflow.util.CacheHelper
 import static nextflow.util.CacheHelper.HashMode
 import static nextflow.util.CheckHelper.checkParams
 /**
- * Implements the body of {@link DataflowEx#collectFile(groovyx.gpars.dataflow.DataflowReadChannel)} operator
+ * Implements the body of {@link OperatorEx#collectFile(groovyx.gpars.dataflow.DataflowReadChannel)} operator
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */

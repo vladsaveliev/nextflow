@@ -71,6 +71,7 @@ class Channel  {
      */
     @Deprecated
     static DataflowChannel create() {
+        log.warn("The channel `create` method is deprecated -- it will be removed in a future release")
         new DataflowQueue()
     }
 

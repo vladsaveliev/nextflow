@@ -18,6 +18,7 @@ package nextflow.ast
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.script.BaseScript
 import nextflow.script.TaskBody
 import nextflow.script.TaskClosure
 import nextflow.script.TokenEnvCall
@@ -70,6 +71,15 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 @GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class NextflowDSLImpl implements ASTTransformation {
 
+    static private Set<String> RESERVED_NAMES = ['main','run','runScript'] as Set
+
+    static {
+        // existing method cannot be used for custom script definition
+        for( def method : BaseScript.getMethods() ) {
+            RESERVED_NAMES.add(method.name)
+        }
+    }
+
     @Override
     void visit(ASTNode[] astNodes, SourceUnit unit) {
 
@@ -99,6 +109,8 @@ class NextflowDSLImpl implements ASTTransformation {
 
         private Set<String> functionNames = []
 
+        private int anonymousWorkflow
+
         protected SourceUnit getSourceUnit() { unit }
 
 
@@ -108,8 +120,10 @@ class NextflowDSLImpl implements ASTTransformation {
 
         @Override
         void visitMethod(MethodNode node) {
-            if( node.public && !node.static && !node.synthetic && !node.metaDataMap?.'org.codehaus.groovy.ast.MethodNode.isScriptBody')
-                functionNames.add(node.name)
+            if( node.public && !node.static && !node.synthetic && !node.metaDataMap?.'org.codehaus.groovy.ast.MethodNode.isScriptBody') {
+                if( !isIllegalName(node.name, node))
+                    functionNames.add(node.name)
+            }
             super.visitMethod(node)
         }
 
@@ -167,6 +181,11 @@ class NextflowDSLImpl implements ASTTransformation {
 
             // anonymous workflow definition
             if( len == 1 && args[0] instanceof ClosureExpression ) {
+                if( anonymousWorkflow++ > 0 ) {
+                    unit.addError( new SyntaxException("Duplicate entry workflow definition", methodCall.lineNumber, methodCall.columnNumber+8))
+                    return
+                }
+
                 def newArgs = new ArgumentListExpression()
                 def body = (ClosureExpression)args[0]
                 newArgs.addExpression( makeWorkflowBodyWrapper(body) )
@@ -185,8 +204,7 @@ class NextflowDSLImpl implements ASTTransformation {
             final nested = args[0] as MethodCallExpression
             final name = nested.getMethodAsString()
             // check the process name is not defined yet
-            if( isNameDuplicate(name) ) {
-                unit.addError( new SyntaxException("Identifier `$name` is already used by another definition", methodCall.lineNumber, methodCall.columnNumber+8) )
+            if( isIllegalName(name, methodCall) ) {
                 return
             }
             workflowNames.add(name)
@@ -218,11 +236,13 @@ class NextflowDSLImpl implements ASTTransformation {
         }
 
         protected Expression makeWorkflowBodyWrapper( ClosureExpression closure ) {
+            // make a copy to clear closure implicit `it` parameter
+            def copy = new ClosureExpression(null, closure.code)
             def buffer = new StringBuilder()
-            def block = (BlockStatement) closure.getCode()
+            def block = (BlockStatement) closure.code
             for( Statement stm : block.getStatements() )
                 readSource(stm, buffer, unit)
-            makeScriptWrapper(closure, buffer.toString(), 'workflow', unit)
+            makeScriptWrapper(copy, buffer.toString(), 'workflow', unit)
         }
 
         protected void syntaxError(ASTNode node, String message) {
@@ -896,9 +916,16 @@ class NextflowDSLImpl implements ASTTransformation {
             return false
         }
 
-        protected isNameDuplicate(String name) {
-            // TODO discard declared names 
-            name in functionNames || name in workflowNames || name in processNames
+        protected boolean isIllegalName(String name, ASTNode node) {
+            if( name in RESERVED_NAMES ) {
+                unit.addError( new SyntaxException("Identifier `$name` is reserved for internal use", node.lineNumber, node.columnNumber+8) )
+                return true
+            }
+            if( name in functionNames || name in workflowNames || name in processNames ) {
+                unit.addError( new SyntaxException("Identifier `$name` is already used by another definition", node.lineNumber, node.columnNumber+8) )
+                return true
+            }
+            return false
         }
 
         /**
@@ -928,8 +955,7 @@ class NextflowDSLImpl implements ASTTransformation {
             def nested = list[0] as MethodCallExpression
             def name = nested.getMethodAsString()
             // check the process name is not defined yet
-            if( isNameDuplicate(name) ) {
-                unit.addError( new SyntaxException("Identifier `$name` is already used by another definition", methodCall.lineNumber, methodCall.columnNumber+8) )
+            if( isIllegalName(name, methodCall) ) {
                 return
             }
             processNames.add(name)
@@ -986,6 +1012,8 @@ class NextflowDSLImpl implements ASTTransformation {
 
         private boolean declaration
 
+        private int deep
+
         VariableVisitor( SourceUnit unit ) {
             this.sourceUnit = unit
         }
@@ -1000,6 +1028,12 @@ class NextflowDSLImpl implements ASTTransformation {
             }
 
             return target instanceof VariableExpression
+        }
+
+        @Override
+        void visitClosureExpression(ClosureExpression expression) {
+            if( deep++ == 0 )
+                super.visitClosureExpression(expression)
         }
 
         @Override

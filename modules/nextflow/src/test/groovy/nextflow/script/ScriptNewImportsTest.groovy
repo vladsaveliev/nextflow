@@ -21,6 +21,7 @@ import spock.lang.Specification
 import java.nio.file.Files
 
 import groovyx.gpars.dataflow.DataflowReadChannel
+import nextflow.NextflowMeta
 import nextflow.exception.DuplicateScriptDefinitionException
 import test.MockScriptRunner
 import test.TestHelper
@@ -28,7 +29,10 @@ import test.TestHelper
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-class BaseScriptTest extends Specification {
+class ScriptNewImportsTest extends Specification {
+
+    def setupSpec() { NextflowMeta.instance.enableModules() }
+    def cleanupSpec() { NextflowMeta.instance.disableModules() }
 
     def 'should invoke foreign functions - case 1' () {
         given:
@@ -50,7 +54,7 @@ class BaseScriptTest extends Specification {
         }
         '''
 
-        SCRIPT.text = """
+        SCRIPT.text = """  
         require "$MODULE"
    
         def local_func() {
@@ -313,7 +317,7 @@ class BaseScriptTest extends Specification {
         '''
 
         when:
-        SCRIPT.text = """
+        SCRIPT.text = """  
         require 'module.nf'        
 
         workflow {
@@ -329,7 +333,7 @@ class BaseScriptTest extends Specification {
 
 
         when:
-        SCRIPT.text = """
+        SCRIPT.text = """ 
         require 'module.nf'        
         
         workflow {
@@ -364,7 +368,7 @@ class BaseScriptTest extends Specification {
 
         // inject params in the module
         // and invoke the process 'foo'
-        SCRIPT.text = """ 
+        SCRIPT.text = """     
         require "module.nf", params:[foo:'Hello', bar: 'world']
             
         workflow { 
@@ -421,6 +425,7 @@ class BaseScriptTest extends Specification {
 
     }
 
+
     def 'should invoke custom functions' () {
         given:
         def folder = TestHelper.createInMemTempDir()
@@ -437,7 +442,7 @@ class BaseScriptTest extends Specification {
         }
         '''
 
-        SCRIPT.text = """
+        SCRIPT.text = """  
         require 'module.nf'
 
         def str = foo('dlrow')
@@ -468,7 +473,7 @@ class BaseScriptTest extends Specification {
         }
         '''
 
-        SCRIPT.text = """
+        SCRIPT.text = """ 
         require 'module.nf', params:[x: 'Hola mundo']
         workflow {
             return foo()
@@ -482,5 +487,6 @@ class BaseScriptTest extends Specification {
         noExceptionThrown()
         result.val == 'echo Hola mundo'
     }
+
 
 }

@@ -21,10 +21,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 import groovy.transform.CompileStatic
-import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.DataflowBroadcast
-import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
@@ -38,7 +36,6 @@ import groovyx.gpars.dataflow.operator.PoisonPill
 import nextflow.Channel
 import nextflow.Global
 import nextflow.Session
-import nextflow.dag.NodeMarker
 import nextflow.splitter.FastaSplitter
 import nextflow.splitter.FastqSplitter
 import nextflow.splitter.TextSplitter
@@ -60,28 +57,30 @@ import static nextflow.util.CheckHelper.checkParams
  */
 
 @Slf4j
-class DataflowEx {
+class OperatorEx {
+
+    static final public OperatorEx instance = new OperatorEx()
 
     private static Session getSession() { Global.getSession() as Session }
 
     final private static Set<String> methodNames
 
-    final static private List<String> SPECIAL_NAMES = ["choice","merge","separate"]
-
-    final static MetaClass meta = DataflowEx.getMetaClass()
+    final static MetaClass meta = OperatorEx.getMetaClass()
 
     static {
-        methodNames = getMethods0()
+        methodNames = getDeclaredExtensionMethods0()
         log.trace "Dataflow extension methods: ${methodNames.sort().join(',')}"
     }
 
     @CompileStatic
-    static private Set<String> getMethods0() {
+    static private Set<String> getDeclaredExtensionMethods0() {
         def result = new HashSet<>(30)
-        def methods = DataflowEx.class.getDeclaredMethods()
+        def methods = OperatorEx.class.getDeclaredMethods()
         for( def handle : methods ) {
+            if( !Modifier.isPublic(handle.getModifiers()) ) continue
+            if( Modifier.isStatic(handle.getModifiers()) ) continue
             def params=handle.getParameterTypes()
-            if( Modifier.isPublic(handle.getModifiers()) && !Modifier.isStatic(handle.getModifiers()) && params.length>0 && isReadChannel(params[0]) )
+            if( params.length>0 && isReadChannel(params[0]) )
                 result.add(handle.name)
         }
         return result
@@ -100,90 +99,11 @@ class DataflowEx {
         return false
     }
 
-    @CompileStatic
-    static private <T> T read0(source){
-        if( source instanceof DataflowBroadcast )
-            return (T)ChannelHelper.get(source)
-
-        if( source instanceof DataflowQueue )
-            return (T)ChannelHelper.get(source)
-
-        else
-            return (T)source
-    }
 
     @CompileStatic
-    Object invokeMethod(Object channel, String methodName, Object[] args) {
-        final DataflowReadChannel source = read0(channel)
-        for( int i=0; i<args.length; i++ )
-            args[i] = read0(args[i])
-        
-        // TODO sanitize channels passed are args
-        return invokeMethod0(source,methodName,args)
+    Object invokeOperator(Object channel, String method, Object[] args) {
+        new OpCall(this,channel,method,args).call()
     }
-
-    @CompileStatic
-    private invokeMethod0(DataflowReadChannel channel, String methodName, Object[] args) {
-        // make it possible to invoke some dataflow operator specifying an open array and ending with a closure argument
-        // For example:
-        //  DataflowReadChannel# separate(final List<DataflowWriteChannel<?>> outputs, final Closure<List<Object>> code)
-        // can be invoked as:
-        //  queue.separate( x, y, z ) { ... }
-        if( checkOpenArrayDataflowMethod(SPECIAL_NAMES, methodName, args) ) {
-            Object[] newArgs = new Object[3]
-            newArgs[0] = channel
-            newArgs[1] = toListOfChannel(args)
-            newArgs[2] = args[args.length-1]
-            return meta.invokeMethod(this, methodName, newArgs);
-        }
-        else {
-            // create the invocation parameters array
-            Object[] params = new Object[args.length+1];
-            params[0] = channel;
-            for( int i=0; i<args.length; i++ ) {
-                params[i+1] = args[i];
-            }
-
-            return meta.invokeMethod(this, methodName, params);
-        }
-    }
-
-    /**
-     *  Check the following conditions:
-     *  <li>method name is the requested one
-     *  <li>the target object is a {@link groovyx.gpars.dataflow.DataflowReadChannel}
-     *  <li>the all items in the last arguments array are {@link groovyx.gpars.dataflow.DataflowWriteChannel}
-     *  <li>the last item in the arguments array is a {@link Closure}
-     */
-    @CompileStatic
-    private static boolean checkOpenArrayDataflowMethod(List<String> validNames, String methodName, Object[] args) {
-        if( !validNames.contains(methodName) )
-            return false
-        if( args == null || args.length<2 )
-            return false
-        if( !(args[args.length-1] instanceof Closure) )
-            return false
-        for( int i=0; i<args.length-1; i++ ) {
-            if( !(args[i] instanceof DataflowWriteChannel ))
-                return false
-        }
-
-        return true
-    }
-
-
-    /**
-     * Given an array of arguments copy the first n-1 to a list of {@link groovyx.gpars.dataflow.DataflowWriteChannel}
-     */
-    @CompileStatic
-    private static List<DataflowWriteChannel> toListOfChannel( Object[] args )  {
-        List<DataflowWriteChannel> result = new ArrayList<>(args.length-1);
-        for( int i=0; i<args.length-1; i++ ) {
-            result.add(i, (DataflowWriteChannel)args[i]);
-        }
-        return result;
-    }
-
 
     /**
      * Subscribe *onNext* event
@@ -194,7 +114,6 @@ class DataflowEx {
      */
     DataflowReadChannel subscribe(final DataflowReadChannel source, final Closure closure) {
         subscribeImpl( source, [onNext: closure] )
-        NodeMarker.addOperatorNode('subscribe', source, null)
         return source
     }
 
@@ -207,7 +126,6 @@ class DataflowEx {
      */
     DataflowReadChannel subscribe(final DataflowReadChannel source, final Map<String,Closure> events ) {
         subscribeImpl(source, events)
-        NodeMarker.addOperatorNode('subscribe', source, null)
         return source
     }
 
@@ -219,14 +137,10 @@ class DataflowEx {
      * @return
      */
     DataflowWriteChannel chain(final DataflowReadChannel<?> source, final Closure closure) {
-
         final target = ChannelHelper.createBy(source)
         newOperator(source, target, new ChainWithClosure(closure))
-        NodeMarker.addOperatorNode('chain', source, target)
-
         return target
     }
-
 
     /**
      * Chain operator, this is a synonym of {@code DataflowReadChannel.chainWith}
@@ -236,11 +150,8 @@ class DataflowEx {
      * @return
      */
     DataflowWriteChannel chain(final DataflowReadChannel<?> source, final Map<String, Object> params, final Closure closure) {
-
         final target = ChannelHelper.createBy(source)
         chainImpl(source, target, params, closure)
-        NodeMarker.addOperatorNode('chain', source, target)
-
         return target;
     }
 
@@ -254,13 +165,8 @@ class DataflowEx {
     DataflowWriteChannel map(final DataflowReadChannel source, final Closure closure) {
         assert source != null
         assert closure
-
-        def target = new MapOp(source, closure).apply()
-
-        NodeMarker.addOperatorNode('map', source, target)
-        return target;
+        return new MapOp(source, closure).apply()
     }
-
 
     /**
      * Transform the items emitted by a channel by applying a function to each of them and then flattens the results of that function.
@@ -285,7 +191,7 @@ class DataflowEx {
 
             @Override
             boolean onException(final DataflowProcessor processor, final Throwable e) {
-                DataflowEx.log.error("@unknown", e)
+                OperatorEx.log.error("@unknown", e)
                 session.abort(e)
                 return true;
             }
@@ -322,7 +228,6 @@ class DataflowEx {
             }
         }
 
-        NodeMarker.addOperatorNode('flatMap', source, target)
         return target
     }
 
@@ -345,10 +250,8 @@ class DataflowEx {
 
         final target = new DataflowVariable()
         reduceImpl( source, target, null, closure )
-        NodeMarker.addOperatorNode('reduce', source, target)
         return target
     }
-
 
     /**
      *
@@ -370,25 +273,21 @@ class DataflowEx {
 
         final target = new DataflowVariable()
         reduceImpl( source, target, seed, closure )
-        NodeMarker.addOperatorNode('reduce', source, target)
         return target
     }
 
     DataflowWriteChannel collectFile( final DataflowReadChannel source, final Closure closure = null ) {
         final result = new CollectFileOp(source, null, closure).apply()
-        NodeMarker.addOperatorNode('collectFile', source, result)
         return result
     }
 
     DataflowWriteChannel collectFile( final DataflowReadChannel source, Map params, final Closure closure = null ) {
         def result = new CollectFileOp(source, params, closure).apply()
-        NodeMarker.addOperatorNode('collectFile', source, result)
         return result
     }
 
     DataflowWriteChannel groupTuple( final DataflowReadChannel source, final Map params=null ) {
         def result = new GroupTupleOp(params, source).apply()
-        NodeMarker.addOperatorNode('groupTuple', source, result)
         return result
     }
 
@@ -425,7 +324,6 @@ class DataflowEx {
             })
         }
 
-        NodeMarker.addOperatorNode('filter', source, target)
         return target
     }
 
@@ -444,7 +342,6 @@ class DataflowEx {
             })
         }
 
-        NodeMarker.addOperatorNode('filter', source, target)
         return target
     }
 
@@ -462,7 +359,7 @@ class DataflowEx {
                 proc.bindOutput(it)
             }
         })
-        NodeMarker.addOperatorNode('until', source, target)
+
         return target
     }
 
@@ -515,7 +412,6 @@ class DataflowEx {
         // filter removing all duplicates
         chainImpl(source, target, [listeners: [events]], filter )
 
-        NodeMarker.addOperatorNode('unique', source, target)
         return target
     }
 
@@ -554,7 +450,6 @@ class DataflowEx {
 
         chainImpl(source, target, [:], filter)
 
-        NodeMarker.addOperatorNode('distinct', source, target)
         return target
     }
 
@@ -578,7 +473,6 @@ class DataflowEx {
 
         def target = new DataflowVariable()
         source.whenBound { target.bind(it) }
-        NodeMarker.addOperatorNode('first', source, target)
         return target
     }
 
@@ -611,7 +505,6 @@ class DataflowEx {
             }
         }
 
-        NodeMarker.addOperatorNode('first', source, target)
         return target
     }
 
@@ -647,7 +540,7 @@ class DataflowEx {
             }
 
             boolean onException(final DataflowProcessor processor, final Throwable e) {
-                DataflowEx.log.error("@unknown", e)
+                OperatorEx.log.error("@unknown", e)
                 session.abort(e)
                 return true;
             }
@@ -659,7 +552,6 @@ class DataflowEx {
                 listeners: (n > 0 ? [listener] : []),
                 new ChainWithClosure(new CopyChannelsClosure()))
 
-        NodeMarker.addOperatorNode('take', source, target)
         return target
     }
 
@@ -674,7 +566,6 @@ class DataflowEx {
         def target = new DataflowVariable()
         def last = null
         subscribeImpl( source, [onNext: { last = it }, onComplete: {  target.bind(last) }] )
-        NodeMarker.addOperatorNode('last', source, target)
         return target
     }
 
@@ -684,7 +575,6 @@ class DataflowEx {
 
     DataflowWriteChannel collect(final DataflowReadChannel source, Map opts, Closure action=null) {
         final target = new CollectOp(source,action,opts).apply()
-        NodeMarker.addOperatorNode('collect', source, target)
         return target
     }
 
@@ -697,7 +587,6 @@ class DataflowEx {
      */
     DataflowWriteChannel toList(final DataflowReadChannel source) {
         final target = ToListOp.apply(source)
-        NodeMarker.addOperatorNode('toList', source, target)
         return target
     }
 
@@ -709,7 +598,6 @@ class DataflowEx {
      */
     DataflowWriteChannel toSortedList(final DataflowReadChannel source, Closure closure = null) {
         final target = new ToListOp(source, closure ?: true).apply()
-        NodeMarker.addOperatorNode('toSortedList', source, target)
         return target as DataflowVariable
     }
 
@@ -722,7 +610,6 @@ class DataflowEx {
      */
     DataflowWriteChannel count(final DataflowReadChannel source ) {
         final target = count0(source, null)
-        NodeMarker.addOperatorNode('count', source, target)
         return target
     }
 
@@ -735,7 +622,6 @@ class DataflowEx {
      */
     DataflowWriteChannel count(final DataflowReadChannel source, final Object criteria ) {
         final target = count0(source, criteria)
-        NodeMarker.addOperatorNode('count', source, target)
         return target
     }
 
@@ -765,7 +651,7 @@ class DataflowEx {
      * @return A {@code DataflowVariable} returning the a {@code Map} containing the counting values for each key
      */
     @Deprecated
-    DataflowWriteChannel<Map> countBy(final DataflowReadChannel<?> source ) {
+    DataflowWriteChannel<Map> countBy(final DataflowReadChannel source ) {
         countBy(source, { it })
     }
 
@@ -777,7 +663,7 @@ class DataflowEx {
      * @return
      */
     @Deprecated
-    DataflowWriteChannel<Map> countBy(final DataflowReadChannel<?> source, final Closure criteria ) {
+    DataflowWriteChannel<Map> countBy(final DataflowReadChannel source, final Closure criteria ) {
 
         final target = new DataflowVariable()
 
@@ -788,7 +674,6 @@ class DataflowEx {
                 return map
         }
 
-        NodeMarker.addOperatorNode('countBy', source, target)
         return target
     }
 
@@ -801,7 +686,6 @@ class DataflowEx {
     DataflowWriteChannel min(final DataflowReadChannel source) {
         final target = new DataflowVariable()
         reduceImpl(source, target, null) { min, val -> val<min ? val : min }
-        NodeMarker.addOperatorNode('min', source, target)
         return target
     }
 
@@ -827,7 +711,6 @@ class DataflowEx {
 
         final target = new DataflowVariable()
         reduceImpl(source, target, null, action)
-        NodeMarker.addOperatorNode('min', source, target)
         return target
     }
 
@@ -841,7 +724,6 @@ class DataflowEx {
     DataflowWriteChannel min(final DataflowReadChannel source, Comparator comparator) {
         final target = new DataflowVariable()
         reduceImpl(source, target, null) { a, b -> comparator.compare(a,b)<0 ? a : b }
-        NodeMarker.addOperatorNode('min', source, target)
         return target
     }
 
@@ -854,7 +736,6 @@ class DataflowEx {
     DataflowWriteChannel max(final DataflowReadChannel source) {
         final target = new DataflowVariable()
         reduceImpl(source,target, null) { max, val -> val>max ? val : max }
-        NodeMarker.addOperatorNode('max', source, target)
         return target
     }
 
@@ -883,7 +764,6 @@ class DataflowEx {
 
         final target = new DataflowVariable()
         reduceImpl(source, target, null, action)
-        NodeMarker.addOperatorNode('max', source, target)
         return target
     }
 
@@ -897,7 +777,6 @@ class DataflowEx {
     DataflowVariable max(final DataflowReadChannel source, Comparator comparator) {
         final target = new DataflowVariable()
         reduceImpl(source, target, null) { a, b -> comparator.compare(a,b)>0 ? a : b }
-        NodeMarker.addOperatorNode('max', source, target)
         return target
     }
 
@@ -913,7 +792,6 @@ class DataflowEx {
         def target = new DataflowVariable()
         def aggregate = new Aggregate(name: 'sum', action: closure)
         subscribeImpl(source, [onNext: aggregate.&process, onComplete: { target.bind( aggregate.result ) }])
-        NodeMarker.addOperatorNode('sum', source, target)
         return target
     }
 
@@ -923,7 +801,6 @@ class DataflowEx {
         def target = new DataflowVariable()
         def aggregate = new Aggregate(name: 'mean', action: closure, mean: true)
         subscribeImpl(source, [onNext: aggregate.&process, onComplete: { target.bind( aggregate.result ) }])
-        NodeMarker.addOperatorNode('mean', source, target)
         return target
     }
 
@@ -976,7 +853,6 @@ class DataflowEx {
      */
     @Deprecated
     DataflowWriteChannel<Map> groupBy(final DataflowReadChannel source, final params = null ) {
-        log.warn "Operator `groupBy` is deprecated and it will be removed in a future release"
         int index = 0
         Closure mapper = DEFAULT_MAPPING_CLOSURE
 
@@ -1000,7 +876,6 @@ class DataflowEx {
             return map
         }
 
-        NodeMarker.addOperatorNode('groupBy', source, target)
         return target
     }
 
@@ -1013,8 +888,8 @@ class DataflowEx {
      * @param targets The routing map i.e. a {@code Map} associating each key to the target channel
      * @param mapper A optional mapping function that given an entry return its key
      */
+    @Deprecated
     void route( final DataflowReadChannel source, Map<?,DataflowWriteChannel> targets, Closure mapper = DEFAULT_MAPPING_CLOSURE ) {
-        log.warn "Operator `route` is deprecated -- It will be removed in a future release"
 
         DataflowHelper.subscribeImpl(source,
                 [
@@ -1035,12 +910,11 @@ class DataflowEx {
                 ]
         )
 
-        NodeMarker.addOperatorNode('route', source, targets.values())
     }
 
+    @Deprecated
     DataflowWriteChannel route( final DataflowReadChannel source, final Closure mapper = DEFAULT_MAPPING_CLOSURE ) {
         assert !(source instanceof DataflowExpression)
-        log.warn "Operator `route` is deprecated and it will be removed in a future release"
 
         def allChannels = new ConcurrentHashMap()
         def target = ChannelHelper.create()
@@ -1068,7 +942,6 @@ class DataflowEx {
                 ]
         )
 
-        NodeMarker.addOperatorNode('route', source, target)
         return target
     }
 
@@ -1079,11 +952,22 @@ class DataflowEx {
 
         def inputs
         switch(other) {
-            case DataflowExpression: inputs = other; break
-            case DataflowReadChannel: inputs = ToListOp.apply((DataflowReadChannel)other); break
-            case Collection: inputs = Channel.value(other); break
-            case (Object[]): inputs = Channel.value(other as List); break
-            default: throw new IllegalArgumentException("Not a valid argument for 'spread' operator [${other?.class?.simpleName}]: ${other} -- Use a Collection or a channel instead. ")
+            case DataflowExpression:
+                inputs = other
+                break
+            case DataflowReadChannel:
+                inputs = ToListOp.apply((DataflowReadChannel)other);
+                break
+            case Collection:
+                inputs = Channel.value(other)
+                OpCall.current.get().inputs.add(inputs)
+                break
+            case (Object[]):
+                inputs = Channel.value(other as List)
+                OpCall.current.get().inputs.add(inputs)
+                break
+            default:
+                throw new IllegalArgumentException("Not a valid argument for 'spread' operator [${other?.class?.simpleName}]: ${other} -- Use a Collection or a channel instead. ")
         }
 
         final stopOnFirst = source instanceof DataflowExpression
@@ -1097,7 +981,7 @@ class DataflowEx {
 
             @Override
             boolean onException(final DataflowProcessor processor, final Throwable e) {
-                DataflowEx.log.error("@unknown", e)
+                OperatorEx.log.error("@unknown", e)
                 session.abort(e)
                 return true;
             }
@@ -1117,10 +1001,6 @@ class DataflowEx {
                     .each{ Collection it -> proc.bindOutput(it.flatten())  }
         }
 
-        def sources = new ArrayList(2)
-        sources.add ( source )
-        sources.add ( other instanceof DataflowReadChannel ? other : inputs  )
-        NodeMarker.addOperatorNode('spread', sources, target)
         return target
     }
 
@@ -1135,7 +1015,6 @@ class DataflowEx {
         final sources = op.inputs
         if( params?.by != null ) op.pivot = params.by
         final target = op.apply()
-        NodeMarker.addOperatorNode('combine', sources, target)
         return target
     }
 
@@ -1153,7 +1032,7 @@ class DataflowEx {
                 }
 
                 boolean onException(final DataflowProcessor processor, final Throwable e) {
-                    DataflowEx.log.error("@unknown", e)
+                    OperatorEx.log.error("@unknown", e)
                     session.abort(e)
                     return true;
                 }
@@ -1181,7 +1060,6 @@ class DataflowEx {
             }
         }
 
-        NodeMarker.addOperatorNode('flatten', source, target)
         return target
     }
 
@@ -1199,7 +1077,6 @@ class DataflowEx {
                         .setParams(params)
                         .setCloseCriteria(closingCriteria)
                         .apply()
-        NodeMarker.addOperatorNode('buffer', source, target)
         return target
     }
 
@@ -1212,7 +1089,6 @@ class DataflowEx {
                 .setCloseCriteria(closingCriteria)
                 .apply()
 
-        NodeMarker.addOperatorNode('buffer', source, target)
         return target
     }
 
@@ -1223,7 +1099,6 @@ class DataflowEx {
                         .setParams(params)
                         .apply()
 
-        NodeMarker.addOperatorNode('buffer', source, target)
         return target
     }
 
@@ -1237,7 +1112,6 @@ class DataflowEx {
                         .setParams( size: size, remainder: keepRemainder )
                         .apply()
 
-        NodeMarker.addOperatorNode('collate', source, target)
         return target
     }
 
@@ -1271,7 +1145,7 @@ class DataflowEx {
 
             @Override
             boolean onException(DataflowProcessor processor, Throwable e) {
-                DataflowEx.log.error("@unknown", e)
+                OperatorEx.log.error("@unknown", e)
                 session.abort(e)
                 return true
             }
@@ -1297,7 +1171,6 @@ class DataflowEx {
 
         }
 
-        NodeMarker.addOperatorNode('collate', source, target)
         return target
     }
 
@@ -1327,7 +1200,6 @@ class DataflowEx {
         def allSources = [source]
         allSources.addAll(others)
 
-        NodeMarker.addOperatorNode('mix', allSources, target)
         return target
     }
 
@@ -1335,7 +1207,6 @@ class DataflowEx {
         if( right==null ) throw new IllegalArgumentException("Operator `join` argument cannot be null")
         if( !(right instanceof DataflowReadChannel) ) throw new IllegalArgumentException("Invalid operator `join` argument [${right.getClass().getName()}] -- it must be a channel type")
         def target = new JoinOp(left,right) .apply()
-        NodeMarker.addOperatorNode('join', [left, right], target)
         return target
     }
 
@@ -1343,7 +1214,6 @@ class DataflowEx {
         if( right==null ) throw new IllegalArgumentException("Operator `join` argument cannot be null")
         if( !(right instanceof DataflowReadChannel) ) throw new IllegalArgumentException("Invalid operator `join` argument [${right.getClass().getName()}] -- it must be a channel type")
         def target = new JoinOp(left,right,opts) .apply()
-        NodeMarker.addOperatorNode('join', [left, right], target)
         return target
     }
 
@@ -1363,7 +1233,6 @@ class DataflowEx {
                         .setOpts(opts)
                         .apply()
 
-        NodeMarker.addOperatorNode('phase', [source, other], target)
         return target
     }
 
@@ -1373,7 +1242,6 @@ class DataflowEx {
                         .setMapper(mapper)
                         .apply()
 
-        NodeMarker.addOperatorNode('phase', [source, other], target)
         return target
     }
 
@@ -1433,7 +1301,6 @@ class DataflowEx {
                     .setMapper(mapper)
                     .apply()
 
-        NodeMarker.addOperatorNode('cross', [source,other], target)
         return target
     }
 
@@ -1452,7 +1319,6 @@ class DataflowEx {
         def allSources = [source]
         if(others) allSources.addAll(others)
 
-        NodeMarker.addOperatorNode('concat', allSources, target)
         return target
     }
 
@@ -1468,45 +1334,38 @@ class DataflowEx {
     @Deprecated
     void separate( DataflowReadChannel source, final DataflowWriteChannel... outputs ) {
         new SeparateOp(source, outputs as List<DataflowWriteChannel>).apply()
-        NodeMarker.addOperatorNode('separate', source, outputs)
     }
 
     @Deprecated
     void separate(final DataflowReadChannel source, final List<DataflowWriteChannel> outputs) {
         new SeparateOp(source, outputs).apply()
-        NodeMarker.addOperatorNode('separate', source, outputs)
     }
 
     @Deprecated
     void separate(final DataflowReadChannel source, final List<DataflowWriteChannel> outputs, final Closure<List> code) {
         new SeparateOp(source, outputs, code).apply()
-        NodeMarker.addOperatorNode('separate', source, outputs)
     }
 
     @Deprecated
     List<DataflowReadChannel> separate( final DataflowReadChannel source, int n ) {
         def outputs = new SeparateOp(source, n).apply()
-        NodeMarker.addOperatorNode('separate', source, outputs)
         return outputs
     }
 
     @Deprecated
     List<DataflowReadChannel> separate( final DataflowReadChannel source, int n, Closure mapper  ) {
         def outputs = new SeparateOp(source, n, mapper).apply()
-        NodeMarker.addOperatorNode('separate', source, outputs)
         return outputs
     }
 
     @Deprecated
     void into( DataflowReadChannel source, final DataflowWriteChannel... targets ) {
         new IntoOp(source, targets as List<DataflowWriteChannel>).apply()
-        NodeMarker.addOperatorNode('into', source, targets)
     }
 
     @Deprecated
     List<DataflowReadChannel> into( final DataflowReadChannel source, int n ) {
         def outputs = new IntoOp(source,n).apply().getOutputs()
-        NodeMarker.addOperatorNode('into', source, outputs)
         return outputs
     }
 
@@ -1527,7 +1386,7 @@ class DataflowEx {
     @Deprecated
     void into( DataflowReadChannel source, Closure holder ) {
         def outputs = new IntoOp(source,holder).apply().getOutputs()
-        NodeMarker.addOperatorNode('into', source, outputs)
+        OpCall.current.get().outputs.addAll(outputs)
     }
 
 
@@ -1547,13 +1406,12 @@ class DataflowEx {
      */
     DataflowWriteChannel tap( final DataflowReadChannel source, final Closure holder ) {
         def tap = new TapOp(source, holder).apply()
-        NodeMarker.addOperatorNode('tap', source, tap.outputs)
+        OpCall.current.get().outputs.addAll( tap.outputs )
         return tap.result
     }
 
     DataflowWriteChannel tap( final DataflowReadChannel source, final DataflowWriteChannel target ) {
         def tap = new TapOp(source, target).apply()
-        NodeMarker.addOperatorNode('tap', source, tap.outputs)
         return tap.result
     }
 
@@ -1581,7 +1439,6 @@ class DataflowEx {
 
         subscribeImpl(source, [onNext: next, onComplete: complete])
 
-        NodeMarker.addOperatorNode('ifEmpty', source, result)
         return result
     }
 
@@ -1592,7 +1449,6 @@ class DataflowEx {
      */
     void print(final DataflowReadChannel<?> source, Closure closure = null) {
         subscribeImpl(source, [onNext: { System.out.print( closure ? closure.call(it) : it ) }])
-        NodeMarker.addOperatorNode('print', source, null)
     }
 
     /**
@@ -1602,7 +1458,6 @@ class DataflowEx {
      */
     void println(final DataflowReadChannel<?> source, Closure closure = null) {
         subscribeImpl(source, [onNext: { System.out.println( closure ? closure.call(it) : it ) }])
-        NodeMarker.addOperatorNode('println', source, null)
     }
 
 
@@ -1630,12 +1485,11 @@ class DataflowEx {
             target.bind(it)
         }
 
-        apply. onComplete = { close0(target) }
+        apply. onComplete = { ChannelHelper.close0(target) }
 
         subscribeImpl(source,apply)
 
-        NodeMarker.addOperatorNode('view', source, target)
-        return target;
+        return target
 
     }
 
@@ -1643,42 +1497,33 @@ class DataflowEx {
         view(source, Collections.emptyMap(), closure)
     }
 
-    @PackageScope
-    static DataflowWriteChannel close0(DataflowWriteChannel source) {
-        if( source instanceof DataflowExpression ) {
-            if( !source.isBound() )
-                source.bind(Channel.STOP)
-        }
-        else {
-            source.bind(Channel.STOP)
-        }
-        return source
-    }
-
     void choice(final DataflowReadChannel source, final List<DataflowWriteChannel> outputs, final Closure<Integer> code) {
         new ChoiceOp(source,outputs,code).apply()
-        NodeMarker.addOperatorNode('choice', source, outputs)
     }
 
+    // NO DAG
+    @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final DataflowReadChannel other, final Closure closure=null) {
         final result = ChannelHelper.createBy(source)
         final inputs = [source, other]
         final action = closure ? new ChainWithClosure<>(closure) : new DefaultMergeClosure(inputs.size())
         newOperator(inputs, [result], action)
-        NodeMarker.addOperatorNode('merge', inputs, result)
         return result;
     }
 
+    // NO DAG
+    @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final DataflowReadChannel... others) {
         final result = ChannelHelper.createBy(source)
         final List<DataflowReadChannel> inputs = new ArrayList<DataflowReadChannel>(1 + others.size())
         inputs.add(source);
         inputs.addAll(others);
         newOperator(inputs, [result], new DefaultMergeClosure(1 + others.size()));
-        NodeMarker.addOperatorNode('merge', inputs, result)
         return result;
     }
 
+    // NO DAG
+    @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final List<DataflowReadChannel> others, final Closure closure=null) {
         final result = ChannelHelper.createBy(source)
         final List<DataflowReadChannel> inputs = new ArrayList<DataflowReadChannel>(1 + others.size())
@@ -1686,7 +1531,6 @@ class DataflowEx {
         inputs.add(source);
         inputs.addAll(others);
         newOperator(inputs, [result], action);
-        NodeMarker.addOperatorNode('merge', inputs, result)
         return result;
     }
 
@@ -1695,47 +1539,40 @@ class DataflowEx {
             throw new IllegalArgumentException("Operator `randomSample` cannot be applied to a value channel")
 
         final result = new RandomSampleOp(source,n, seed).apply()
-        NodeMarker.addOperatorNode('randomSample', source, result)
         return result
     }
 
     DataflowWriteChannel toInteger(final DataflowReadChannel source) {
         final target = ChannelHelper.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Integer }))
-        NodeMarker.addOperatorNode('toInteger', source, target)
         return target;
     }
 
     DataflowWriteChannel toLong(final DataflowReadChannel source) {
         final target = ChannelHelper.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Long }))
-        NodeMarker.addOperatorNode('toLong', source, target)
         return target;
     }
 
     DataflowWriteChannel toFloat(final DataflowReadChannel source) {
         final target = ChannelHelper.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Float }))
-        NodeMarker.addOperatorNode('toFloat', source, target)
         return target;
     }
 
     DataflowWriteChannel toDouble(final DataflowReadChannel source) {
         final target = ChannelHelper.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Double }))
-        NodeMarker.addOperatorNode('toDouble', source, target)
         return target;
     }
 
     DataflowWriteChannel transpose( final DataflowReadChannel source, final Map params=null ) {
         def result = new TransposeOp(source,params).apply()
-        NodeMarker.addOperatorNode('transpose', source, result)
         return result
     }
 
     DataflowWriteChannel splitText(DataflowReadChannel source, Map opts=null) {
         final result = new SplitOp( source, 'splitText', opts ).apply()
-        NodeMarker.addOperatorNode('splitText', source, result)
         return result
     }
 
@@ -1745,51 +1582,44 @@ class DataflowEx {
         }
         opts.put('each', action)
         final result = new SplitOp( source, 'splitText', opts ).apply()
-        NodeMarker.addOperatorNode('splitText', source, result)
         return result
     }
 
     DataflowWriteChannel splitCsv(DataflowReadChannel source, Map opts=null) {
         final result = new SplitOp( source, 'splitCsv', opts ).apply()
-        NodeMarker.addOperatorNode('splitCsv', source, result)
         return result
     }
 
     DataflowWriteChannel splitFasta(DataflowReadChannel source, Map opts=null) {
         final result = new SplitOp( source, 'splitFasta', opts ).apply()
-        NodeMarker.addOperatorNode('splitFasta', source, result)
         return result
     }
 
     DataflowWriteChannel splitFastq(DataflowReadChannel source, Map opts=null) {
         final result = new SplitOp( source, 'splitFastq', opts ).apply()
-        NodeMarker.addOperatorNode('splitFastq', source, result)
         return result
     }
 
     DataflowWriteChannel countLines(DataflowReadChannel source, Map opts=null) {
         final splitter = new TextSplitter()
         final result = countOverChannel( source, splitter, opts )
-        NodeMarker.addOperatorNode('countLines', source, result)
         return result
     }
 
     DataflowWriteChannel countFasta(DataflowReadChannel source, Map opts=null) {
         final splitter = new FastaSplitter()
         final result = countOverChannel( source, splitter, opts )
-        NodeMarker.addOperatorNode('countFasta', source, result)
         return result
     }
 
     DataflowWriteChannel countFastq(DataflowReadChannel source, Map opts=null) {
         final splitter = new FastqSplitter()
         final result = countOverChannel( source, splitter, opts )
-        NodeMarker.addOperatorNode('countFastq', source, result)
         return result
     }
 
+    @Deprecated
     DataflowWriteChannel countText(DataflowReadChannel source) {
-        log.warn "Method `countText` has been deprecated -- Use `countLines` instead"
         countLines(source)
     }
 

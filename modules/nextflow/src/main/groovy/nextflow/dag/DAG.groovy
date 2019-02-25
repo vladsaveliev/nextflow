@@ -19,11 +19,14 @@ package nextflow.dag
 import groovy.transform.PackageScope
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
+import groovyx.gpars.dataflow.DataflowBroadcast
+import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.Session
+import nextflow.extension.ChannelHelper
 import nextflow.extension.DataflowHelper
 import nextflow.processor.TaskProcessor
 import nextflow.script.DefaultInParam
@@ -95,7 +98,7 @@ class DAG {
      * @param inputs The operator input(s). It can be either a single channel or a list of channels.
      * @param outputs The operator output(s). It can be either a single channel, a list of channels or {@code null} if the operator has no output.
      */
-    public void addOperatorNode( String label, inputs, outputs, List<DataflowProcessor> operators=null )  {
+    void addOperatorNode( String label, inputs, outputs, List<DataflowProcessor> operators=null )  {
         assert label
         assert inputs
         addVertex(Type.OPERATOR, label, normalizeChannels(inputs), normalizeChannels(outputs), operators )
@@ -174,7 +177,7 @@ class DAG {
         }
         // handle the special case for dataflow variable
         // this kind of channel can be used more than one time as an input
-        else if( entering.channel instanceof DataflowExpression ) {
+        else if( isForkable(entering.channel) ) {
             if( !edge.from ) {
                 edge.from = new Vertex(Type.ORIGIN);
                 int p = vertices.indexOf(edge.to)
@@ -190,6 +193,14 @@ class DAG {
             final name = getChannelName(entering)
             throw new MultipleInputChannelException(name, vertex, edge.to)
         }
+    }
+
+    private boolean isForkable(obj) {
+        if( obj instanceof DataflowExpression )
+            return true
+        if( obj instanceof DataflowBroadcast )
+            return true
+        return obj instanceof DataflowQueue && ChannelHelper.isBridge(obj)
     }
 
     private void outbound( Vertex vertex, ChannelHandler leaving) {
@@ -215,7 +226,7 @@ class DAG {
 
         inputs
                 .findAll { !( it instanceof DefaultInParam)  }
-                .collect { InParam p -> new ChannelHandler(channel: p.inChannel, label: inputName0(p)) }
+                .collect { InParam p -> new ChannelHandler(channel: p.rawChannel, label: inputName0(p)) }
 
     }
 

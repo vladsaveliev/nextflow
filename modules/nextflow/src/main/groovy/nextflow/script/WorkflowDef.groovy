@@ -2,14 +2,17 @@ package nextflow.script
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
+import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
+import nextflow.Channel
+import nextflow.extension.ChannelHelper
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class WorkflowDef implements InvokableDef, Cloneable {
+class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
 
     private String name
 
@@ -51,7 +54,7 @@ class WorkflowDef implements InvokableDef, Cloneable {
 
     @PackageScope List<String> getDeclaredVariables() { new ArrayList<String>(variableNames) }
 
-    @PackageScope Binding getContext() { context }
+    Binding getContext() { context }
 
     private Set<String> getVarNames0() {
         def variableNames = body.getValNames()
@@ -66,40 +69,64 @@ class WorkflowDef implements InvokableDef, Cloneable {
 
 
     protected void collectInputs(Binding context, Object[] args) {
-        if( args.size() != declaredInputs.size() )
-            throw new IllegalArgumentException("Workflow `$name` declares ${declaredInputs.size()} input channels but ${args.size()} were specified")
+        final params = ChannelArrayList.spread(args)
+        if( params.size() != declaredInputs.size() )
+            throw new IllegalArgumentException("Workflow `$name` declares ${declaredInputs.size()} input channels but ${params.size()} were specified")
 
         // attach declared inputs with the invocation arguments
         for( int i=0; i< declaredInputs.size(); i++ ) {
             final name = declaredInputs[i]
-            context.setProperty( name, args[i] )
+            context.setProperty( name, params[i] )
         }
     }
 
-    protected DataflowWriteChannel makeChannel(value) {
-        def result = new DataflowVariable()
-        result.bind(value)
+    protected Object collectOutputs(Object output) {
+        if( output==null )
+            return asChannel(null, true)
+
+        if( output instanceof ChannelArrayList )
+            return output
+
+        if( output instanceof DataflowWriteChannel )
+            return output
+
+        if( !(output instanceof List) ) {
+            return asChannel(output, true)
+        }
+
+        def result = asChannel(ChannelArrayList.spread(output))
+        if( result.size()==0 )
+            return null
+        if( result.size()==1 )
+            return result[0]
         return result
     }
 
-    protected Object collectOutputs(Object value) {
-        if( value==null )
-            return null
+    private List asChannel(List list) {
+        final allScalar = ChannelHelper.allScalar(list)
+        for( int i=0; i<list.size(); i++ ) {
+            def el = list[i]
+            if( !ChannelHelper.isChannel(el) ) {
+                list[i] = asChannel(el, allScalar)
+            }
+        }
+        return list
+    }
 
-        if( value instanceof ProcessOutputArray )
-            return value
-
-        def result = new ArrayList(10)
-        if( value instanceof List ) {
-            for( def item : value ) result.add(item)
+    private DataflowWriteChannel asChannel(Object x, boolean var) {
+        if( var ) {
+            def result = new DataflowVariable()
+            result.bind(x)
+            return result
         }
         else {
-            result.add(value)
+            def result = new DataflowQueue()
+            if( x != null ) {
+                result.bind(x)
+                result.bind(Channel.STOP)
+            }
+            return result
         }
-        if( result.size()==1 )
-            return result[0]
-
-        return new ProcessOutputArray(result)
     }
 
     Object invoke(Object[] args, Binding scope) {
@@ -121,9 +148,35 @@ class WorkflowDef implements InvokableDef, Cloneable {
 
     }
 
+    private getProcessOrWorkflowOrFail(String name) {
+        final meta = ScriptMeta.current()
+        if( !meta )
+            return null
+        def result = meta.getProcess(name)
+        if( !result )
+            result = meta.getWorkflow(name)
+        if( !result )
+            throw new MissingPropertyException("Not such property: $name in workflow execution context")
+        return result
+    }
+
+    private Binding createBinding() {
+        new Binding() {
+            @Override
+            Object getProperty(String propertyName) {
+                try {
+                    return super.getProperty(propertyName)
+                }
+                catch (MissingPropertyException e) {
+                    return getProcessOrWorkflowOrFail(propertyName)
+                }
+            }
+        }
+    }
+
     protected Object run0(Object[] args) {
         // setup the execution context
-        context = new Binding()
+        context = createBinding()
         // setup the workflow inputs
         collectInputs(context, args)
         // invoke the workflow execution

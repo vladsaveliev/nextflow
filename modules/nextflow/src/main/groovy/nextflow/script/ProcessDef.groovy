@@ -26,7 +26,7 @@ import nextflow.Session
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class ProcessDef implements InvokableDef, Cloneable {
+class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
 
     private BaseScript owner
 
@@ -78,16 +78,15 @@ class ProcessDef implements InvokableDef, Cloneable {
 
 
     private call0(Object[] args) {
-        if( args.size()==1 && args[0] instanceof ProcessOutputArray )
-            args = args[0] as Object[]
+        final params = ChannelArrayList.spread(args)
 
         // sanity check
-        if( args.size() != declaredInputs.size() )
-            throw new IllegalArgumentException("Process `$name` declares ${declaredInputs.size()} input channels but ${args.size()} were specified")
+        if( params.size() != declaredInputs.size() )
+            throw new IllegalArgumentException("Process `$name` declares ${declaredInputs.size()} input channels but ${params.size()} were specified")
 
         // set input channels
-        for( int i=0; i<args.size(); i++ ) {
-            declaredInputs[i].from(args[i])
+        for( int i=0; i<params.size(); i++ ) {
+            declaredInputs[i].from(params[i])
         }
 
         // set output channels
@@ -124,7 +123,7 @@ class ProcessDef implements InvokableDef, Cloneable {
 
         return output = (result.size()==1
                 ? output=result[0]
-                : new ProcessOutputArray(result))
+                : new ChannelArrayList(result))
     }
 
 }
