@@ -25,6 +25,8 @@ class FunctionDef implements InvokableDef {
 
     protected FunctionDef() { }
 
+    String getType() { 'function' }
+
     Method getMethod() { method }
 
     String getName() { name }

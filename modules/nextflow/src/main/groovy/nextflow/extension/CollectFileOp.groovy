@@ -73,7 +73,7 @@ class CollectFileOp {
         this.params = params
         this.channel = channel
         this.closure = closure
-        this.result = ChannelHelper.create()
+        this.result = ChannelFactory.create()
 
         createFileCollector()
         defineStoreDirAndFileName()

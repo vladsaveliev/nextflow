@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowReadChannel
@@ -63,18 +64,18 @@ class OperatorEx {
 
     private static Session getSession() { Global.getSession() as Session }
 
-    final private static Set<String> methodNames
+    final public static Set<String> OPERATOR_NAMES
 
     final static MetaClass meta = OperatorEx.getMetaClass()
 
     static {
-        methodNames = getDeclaredExtensionMethods0()
-        log.trace "Dataflow extension methods: ${methodNames.sort().join(',')}"
+        OPERATOR_NAMES = getDeclaredExtensionMethods0()
+        log.trace "Dataflow extension methods: ${OPERATOR_NAMES.sort().join(',')}"
     }
 
     @CompileStatic
     static private Set<String> getDeclaredExtensionMethods0() {
-        def result = new HashSet<>(30)
+        def result = new HashSet<String>(30)
         def methods = OperatorEx.class.getDeclaredMethods()
         for( def handle : methods ) {
             if( !Modifier.isPublic(handle.getModifiers()) ) continue
@@ -94,7 +95,7 @@ class OperatorEx {
     @CompileStatic
     boolean isExtension(Object instance, String name) {
         if( instance instanceof DataflowReadChannel || instance instanceof DataflowBroadcast ) {
-            return methodNames.contains(name)
+            return OPERATOR_NAMES.contains(name)
         }
         return false
     }
@@ -137,7 +138,7 @@ class OperatorEx {
      * @return
      */
     DataflowWriteChannel chain(final DataflowReadChannel<?> source, final Closure closure) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         newOperator(source, target, new ChainWithClosure(closure))
         return target
     }
@@ -150,7 +151,7 @@ class OperatorEx {
      * @return
      */
     DataflowWriteChannel chain(final DataflowReadChannel<?> source, final Map<String, Object> params, final Closure closure) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         chainImpl(source, target, params, closure)
         return target;
     }
@@ -178,7 +179,7 @@ class OperatorEx {
     DataflowWriteChannel flatMap(final DataflowReadChannel<?> source, final Closure closure=null) {
         assert source != null
 
-        final target = ChannelHelper.create()
+        final target = ChannelFactory.create()
 
         def listener = new DataflowEventAdapter() {
             @Override
@@ -310,7 +311,7 @@ class OperatorEx {
     DataflowWriteChannel filter(final DataflowReadChannel source, final Object criteria) {
         def discriminator = new BooleanReturningMethodInvoker("isCase");
 
-        def target = ChannelHelper.createBy(source)
+        def target = ChannelFactory.createBy(source)
         if( source instanceof DataflowExpression ) {
             source.whenBound {
                 def result = it instanceof ControlMessage ? false : discriminator.invoke(criteria, (Object)it)
@@ -328,7 +329,7 @@ class OperatorEx {
     }
 
     DataflowWriteChannel filter(DataflowReadChannel source, final Closure<Boolean> closure) {
-        def target = ChannelHelper.createBy(source)
+        def target = ChannelFactory.createBy(source)
         if( source instanceof DataflowExpression ) {
             source.whenBound {
                 def result = it instanceof ControlMessage ? false : DefaultTypeTransformation.castToBoolean(closure.call(it))
@@ -346,7 +347,7 @@ class OperatorEx {
     }
 
     DataflowWriteChannel until(DataflowReadChannel source, final Closure<Boolean> closure) {
-        def target = ChannelHelper.createBy(source)
+        def target = ChannelFactory.createBy(source)
         newOperator(source, target, {
             final result = DefaultTypeTransformation.castToBoolean(closure.call(it))
             final proc = ((DataflowProcessor) getDelegate())
@@ -388,7 +389,7 @@ class OperatorEx {
     DataflowWriteChannel unique(final DataflowReadChannel source, Closure comparator ) {
 
         def history = [:]
-        def target = ChannelHelper.createBy(source)
+        def target = ChannelFactory.createBy(source)
 
         // when the operator stop clear the history map
         def events = new DataflowEventAdapter() {
@@ -437,7 +438,7 @@ class OperatorEx {
     DataflowWriteChannel distinct( final DataflowReadChannel source, Closure comparator ) {
 
         def previous = null
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         Closure filter = { it ->
 
             def key = comparator.call(it)
@@ -523,7 +524,7 @@ class OperatorEx {
             throw new IllegalArgumentException("Operator `take` cannot be applied to a value channel")
 
         def count = 0
-        final target = ChannelHelper.create()
+        final target = ChannelFactory.create()
 
         if( n==0 ) {
             target.bind(Channel.STOP)
@@ -917,7 +918,7 @@ class OperatorEx {
         assert !(source instanceof DataflowExpression)
 
         def allChannels = new ConcurrentHashMap()
-        def target = ChannelHelper.create()
+        def target = ChannelFactory.create()
 
         subscribeImpl(source,
                 [
@@ -925,7 +926,7 @@ class OperatorEx {
                         def key = mapper ? mapper.call(value) : value
                         def channel = allChannels.get(key)
                         if( channel == null ) {
-                            channel = ChannelHelper.create()
+                            channel = ChannelFactory.create()
                             allChannels[key] = channel
                             // emit the key - channel pair
                             target << [ key, channel ]
@@ -948,7 +949,7 @@ class OperatorEx {
 
     DataflowWriteChannel spread( final DataflowReadChannel source, Object other ) {
 
-        final target = ChannelHelper.create()
+        final target = ChannelFactory.create()
 
         def inputs
         switch(other) {
@@ -1021,7 +1022,7 @@ class OperatorEx {
     DataflowWriteChannel flatten( final DataflowReadChannel source )  {
 
         final listeners = []
-        final target = ChannelHelper.create()
+        final target = ChannelFactory.create()
 
         if( source instanceof DataflowExpression ) {
             listeners << new DataflowEventAdapter() {
@@ -1125,7 +1126,7 @@ class OperatorEx {
         }
 
         // the result queue
-        final target = ChannelHelper.create()
+        final target = ChannelFactory.create()
 
         // the list holding temporary collected elements
         List<List<?>> allBuffers = []
@@ -1185,7 +1186,7 @@ class OperatorEx {
     DataflowWriteChannel mix( DataflowReadChannel source, DataflowReadChannel[] others ) {
         assert others.size()>0
 
-        def target = ChannelHelper.create()
+        def target = ChannelFactory.create()
         def count = new AtomicInteger( others.size()+1 )
         def handlers = [
                 onNext: { target << it },
@@ -1258,7 +1259,8 @@ class OperatorEx {
      * @return
      */
 
-    static Closure DEFAULT_MAPPING_CLOSURE = { obj, int index=0 ->
+    @PackageScope
+    static public Closure DEFAULT_MAPPING_CLOSURE = { obj, int index=0 ->
 
         switch( obj ) {
 
@@ -1427,7 +1429,7 @@ class OperatorEx {
     DataflowWriteChannel ifEmpty( DataflowReadChannel source, value ) {
 
         boolean empty = true
-        final result = ChannelHelper.createBy(source)
+        final result = ChannelFactory.createBy(source)
         final singleton = result instanceof DataflowExpression
         final next = { result.bind(it); empty=false }
         final complete = {
@@ -1475,7 +1477,7 @@ class OperatorEx {
         checkParams('view', opts, PARAMS_VIEW)
         final newLine = opts.newLine != false
 
-        final target = ChannelHelper.createBy(source);
+        final target = ChannelFactory.createBy(source);
 
         final printHandle = newLine ? System.out.&println : System.out.&print
 
@@ -1485,7 +1487,7 @@ class OperatorEx {
             target.bind(it)
         }
 
-        apply. onComplete = { ChannelHelper.close0(target) }
+        apply. onComplete = { ChannelFactory.close0(target) }
 
         subscribeImpl(source,apply)
 
@@ -1504,7 +1506,7 @@ class OperatorEx {
     // NO DAG
     @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final DataflowReadChannel other, final Closure closure=null) {
-        final result = ChannelHelper.createBy(source)
+        final result = ChannelFactory.createBy(source)
         final inputs = [source, other]
         final action = closure ? new ChainWithClosure<>(closure) : new DefaultMergeClosure(inputs.size())
         newOperator(inputs, [result], action)
@@ -1514,7 +1516,7 @@ class OperatorEx {
     // NO DAG
     @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final DataflowReadChannel... others) {
-        final result = ChannelHelper.createBy(source)
+        final result = ChannelFactory.createBy(source)
         final List<DataflowReadChannel> inputs = new ArrayList<DataflowReadChannel>(1 + others.size())
         inputs.add(source);
         inputs.addAll(others);
@@ -1525,7 +1527,7 @@ class OperatorEx {
     // NO DAG
     @Deprecated
     DataflowWriteChannel merge(final DataflowReadChannel source, final List<DataflowReadChannel> others, final Closure closure=null) {
-        final result = ChannelHelper.createBy(source)
+        final result = ChannelFactory.createBy(source)
         final List<DataflowReadChannel> inputs = new ArrayList<DataflowReadChannel>(1 + others.size())
         final action = closure ? new ChainWithClosure<>(closure) : new DefaultMergeClosure(1 + others.size())
         inputs.add(source);
@@ -1543,25 +1545,25 @@ class OperatorEx {
     }
 
     DataflowWriteChannel toInteger(final DataflowReadChannel source) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Integer }))
         return target;
     }
 
     DataflowWriteChannel toLong(final DataflowReadChannel source) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Long }))
         return target;
     }
 
     DataflowWriteChannel toFloat(final DataflowReadChannel source) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Float }))
         return target;
     }
 
     DataflowWriteChannel toDouble(final DataflowReadChannel source) {
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         newOperator(source, target, new ChainWithClosure({ it -> it as Double }))
         return target;
     }

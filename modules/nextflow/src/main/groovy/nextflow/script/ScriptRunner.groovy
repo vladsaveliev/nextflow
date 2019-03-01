@@ -18,9 +18,11 @@ package nextflow.script
 
 import java.nio.file.Path
 
+import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import groovyx.gpars.dataflow.DataflowBroadcast
 import nextflow.Const
 import nextflow.Session
 import nextflow.config.ConfigBuilder
@@ -52,11 +54,6 @@ class ScriptRunner {
      * The pipeline file (it may be null when it's provided as string)
      */
     private ScriptFile scriptFile
-
-    /*
-     * the script raw output
-     */
-    private def output
 
     /**
      * The script result
@@ -204,12 +201,29 @@ class ScriptRunner {
     }
 
 
-    def normalizeOutput() {
+    private read0( obj ) {
+        if( obj instanceof DataflowBroadcast )
+            return obj.createReadChannel()
+        return obj
+    }
+
+    @CompileDynamic
+    def normalizeOutput(output) {
         if( output instanceof Object[] ) {
-            result = output as Collection
+            result = new ArrayList<>(output.size())
+            for( def item : output ) {
+                ((List)result).add(read0(item))
+            }
+        }
+        else if( output instanceof ChannelArrayList ) {
+            def list = []
+            for( int i=0; i<output.size(); i++ ) {
+                list << read0(output[i])
+            }
+            result = new ChannelArrayList(list)
         }
         else {
-            result = output
+            result = read0(output)
         }
     }
 
@@ -272,13 +286,16 @@ class ScriptRunner {
         log.debug "> Launching execution"
         assert scriptParser, "Missing script instance to run"
         // -- launch the script execution
-        output = scriptParser.runScript().getResult()
+        scriptParser.runScript()
+        // -- normalise output
+        normalizeOutput(scriptParser.getResult())
+        // -- ignite dataflow network
+        session.fireDataflowNetwork()
     }
 
     protected terminate() {
         log.debug "> Await termination "
         session.await()
-        normalizeOutput()
         session.destroy()
         session.cleanup()
         log.debug "> Execution complete -- Goodbye"

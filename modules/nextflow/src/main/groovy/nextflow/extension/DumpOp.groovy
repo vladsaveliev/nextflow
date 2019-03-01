@@ -37,6 +37,8 @@ class DumpOp {
 
     static final private Map PARAMS_DUMP = [tag: String]
 
+    private Session session = (Global.session as Session)
+
     private DataflowReadChannel source
 
     private Closure<String> renderer
@@ -50,11 +52,11 @@ class DumpOp {
         this.source = source
         this.tag = opts.tag
         this.renderer = renderer
-        this.dumpNames = (Global.session as Session).getDumpChannels()
+        this.dumpNames = session.getDumpChannels()
     }
 
     DumpOp setSource( DataflowWriteChannel source ) {
-        this.source = ChannelHelper.getReadable(source)
+        this.source = session.getReadChannel(source)
         return this
     }
 
@@ -80,7 +82,7 @@ class DumpOp {
             throw new IllegalArgumentException("Illegal dump operator source channel")
         }
 
-        final target = ChannelHelper.createBy(source)
+        final target = ChannelFactory.createBy(source)
         final events = new HashMap(2)
         events.onNext = {
             def marker = 'DUMP'
@@ -89,7 +91,7 @@ class DumpOp {
             target.bind(it)
         }
 
-        events.onComplete = { ChannelHelper.close0(target) }
+        events.onComplete = { ChannelFactory.close0(target) }
 
         DataflowHelper.subscribeImpl(source, events)
         return target

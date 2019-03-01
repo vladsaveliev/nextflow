@@ -33,7 +33,6 @@ import static test.TestParser.parseAndReturnProcess
 @Timeout(30)
 class ParamsInTest extends Specification {
 
-
     // ==============================================================
     //                  test *input* parameters
     // ==============================================================

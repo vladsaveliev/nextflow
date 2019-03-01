@@ -16,12 +16,14 @@
 
 package nextflow.script
 
+import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.NextflowMeta
 import nextflow.Session
 import nextflow.exception.IllegalInvocationException
-import nextflow.extension.ChannelHelper
+import nextflow.extension.OpCall
+import nextflow.extension.OperatorEx
 import nextflow.processor.TaskProcessor
 /**
  * Any user defined script will extends this class, it provides the base execution context
@@ -29,7 +31,7 @@ import nextflow.processor.TaskProcessor
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
-abstract class BaseScript extends Script {
+abstract class BaseScript extends Script implements InvocationScope {
 
     private static Object[] EMPTY_ARGS = [] as Object[]
 
@@ -38,8 +40,6 @@ abstract class BaseScript extends Script {
     private ProcessFactory processFactory
 
     private TaskProcessor taskProcessor
-
-    private boolean inclusion
 
     private ScriptMeta meta
 
@@ -67,10 +67,6 @@ abstract class BaseScript extends Script {
         session.getConfig()
     }
 
-    private boolean isModuleEnabled() {
-        NextflowMeta.instance.isModuleEnabled()
-    }
-
     /**
      * Access to the last *process* object -- only for testing purpose
      */
@@ -87,10 +83,8 @@ abstract class BaseScript extends Script {
     }
 
     private void setup() {
-        inclusion = binding.module
         session = binding.getSession()
         processFactory = session.newProcessFactory(this)
-        meta.scriptIncludes = new ScriptIncludes(this)
 
         binding.setVariable( 'baseDir', session.baseDir )
         binding.setVariable( 'workDir', session.workDir )
@@ -103,7 +97,7 @@ abstract class BaseScript extends Script {
     }
 
     protected process( String name, Closure body ) {
-        if( inclusion || isModuleEnabled() ) {
+        if( NextflowMeta.is_DSL_2() ) {
             def proc = processFactory.defineProcess(name, body)
             meta.addDefinition(proc)
         }
@@ -115,100 +109,91 @@ abstract class BaseScript extends Script {
     }
 
     protected workflow(TaskBody body) {
-        if(!isModuleEnabled())
+        if(!NextflowMeta.is_DSL_2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to allow the definition of workflow components")
 
-        if( inclusion ) {
+        if( meta.isModule() ) {
             log.debug "Entry workflow ignored in module script: ${meta.scriptPath?.toUriString()}"
             return
         }
 
         def workflow = new WorkflowDef(body)
         meta.addDefinition(workflow)
-        def result = workflow.invoke(EMPTY_ARGS, binding)
-        // finally bridge dataflow queues
-        ChannelHelper.broadcast()
-        return result
+        return workflow.invoke(EMPTY_ARGS, binding)
     }
 
     protected workflow(TaskBody body, String name, List<String> declaredInputs) {
-        if(!isModuleEnabled())
+        if(!NextflowMeta.is_DSL_2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to allow the definition of workflow components")
 
         meta.addDefinition(new WorkflowDef(body,name,declaredInputs))
     }
 
-    protected void require(path) {
-        require(Collections.emptyMap(), path)
-    }
-
-    protected void require(Map opts, path) {
-        if(!isModuleEnabled())
+    protected IncludeDef include( IncludeDef include ) {
+        if(!NextflowMeta.is_DSL_2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to import module files")
-        final params = opts.params ? (Map)opts.params : null
-        meta.scriptIncludes.load(path, params)
+
+        include
+                .setSession(session)
+                .setBinding(binding)
+                .setOwnerScript(meta.getScriptPath())
     }
 
     @Override
-    Object invokeMethod(String name, Object args) {
-        if(!isModuleEnabled())
-            super.invokeMethod(name,args)
-
-        def invokable = meta.getInvokable(name)
-        if( !invokable )
-            return super.invokeMethod(name,args)
-
-        // case 1 - invoke foreign function definition
-        if( invokable instanceof FunctionDef )
-            return invokable.invoke(args)
-
-        final current = WorkflowScope.get().current()
-        if( invokable instanceof WorkflowDef ) {
-            // case 2.b - workflow nested invocation
-            if( current )
-                return invokable.invoke(args, current.context)
-
-            // case 2.a - workflow invocation from main
-            if( !inclusion )
-                return invokable.invoke(args, binding)
-
-            else
-                invokeError(invokable)
+    Object getProperty(String name) {
+        try {
+            super.getProperty(name)
         }
+        catch( MissingPropertyException e ) {
+            def invokable = meta.getInvokable(name)
+            if( invokable )
+                return invokable
 
-        // case 3 - process invocation from within a workflow
-        if( invokable instanceof ProcessDef ) {
-            if( current )
-                return invokable.invoke(args, current.context)
-            else
-                invokeError(invokable)
+            // check it's an operator name
+            if( OperatorEx.OPERATOR_NAMES.contains(name) )
+                return OpCall.create(name)
+
+            throw e
         }
-
-        throw new IllegalArgumentException("Unknown invocation: name=$invokable.name type=${invokable.class.name}")
     }
 
-    private void invokeError(InvokableDef invokable) {
-        def message
-        if( invokable instanceof WorkflowDef )
-            message = "Workflow $invokable.name cannot be invoked from a module script"
-        else if( invokable instanceof ProcessDef )
-            message = "Process $invokable.name can only be invoked from a workflow context"
-        else
-            message = "Invalid invocation context: $invokable.name"
-        throw new IllegalInvocationException(message)
+    private void checkScope(InvokableDef invokable) {
+        if( invokable instanceof ComponentDef && ScriptMeta.current().isModule() ) {
+            throw new IllegalInvocationException(invokable)
+        }
+    }
+
+    @Override
+    @CompileStatic
+    Object invokeMethod(String name, Object args) {
+        if(!NextflowMeta.is_DSL_2())
+            throw new MissingMethodException(name,this.getClass())
+
+        final invokable = meta.getInvokable(name)
+        if( invokable ) {
+            checkScope(invokable)
+            return invokable.invoke(args, ExecutionScope.context())
+        }
+
+        // check it's an operator name
+        if( OperatorEx.OPERATOR_NAMES.contains(name) )
+            return OpCall.create(name, args)
+
+        throw new MissingMethodException(name,this.getClass())
     }
 
     Object run() {
         setup()
-        ScriptScope.get().push(this)
+        ExecutionScope.push(this)
         try {
             runScript()
         }
         finally {
-            ScriptScope.get().pop()
+            ExecutionScope.pop()
         }
     }
 
     protected abstract Object runScript()
+
 
 }

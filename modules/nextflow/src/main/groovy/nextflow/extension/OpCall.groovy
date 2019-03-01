@@ -10,7 +10,10 @@ import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
+import nextflow.Global
+import nextflow.Session
 import nextflow.dag.NodeMarker
+import org.codehaus.groovy.runtime.InvokerHelper
 
 /**
  *
@@ -24,25 +27,48 @@ class OpCall implements Callable {
 
     static ThreadLocal<OpCall> current = new ThreadLocal<>()
 
+    private Session session = Global.session as Session
     private OperatorEx owner
     private String methodName
     private Method method
-    private Object channel
+    private Object source
     private Object[] args
     private Set inputs = new HashSet(5)
     private Set outputs = new HashSet<>(5)
 
-    OpCall(OperatorEx owner, Object channel, String method, Object[] args ) {
+    static OpCall create(String method, Object args) {
+        new OpCall(method, InvokerHelper.asArray(args))
+    }
+
+    static OpCall create(String method) {
+        new OpCall(method, InvokerHelper.asArray(null))
+    }
+
+    OpCall(OperatorEx owner, Object source, String method, Object[] args ) {
         assert owner
         assert method
         this.owner = owner
-        this.channel = channel
+        this.source = source
         this.methodName = method
         this.args = args
     }
 
+    OpCall(String method, Object[] args ) {
+        assert method
+        this.owner = OperatorEx.instance
+        this.methodName = method
+        this.args = args
+    }
+
+    OpCall setSource(DataflowWriteChannel channel) {
+        this.source = channel
+        return this
+    }
+
     @Override
     Object call() throws Exception {
+        if( source==null )
+            throw new IllegalStateException("Missing operator source channel")
         current.set(this)
         try {
             return invoke()
@@ -56,12 +82,12 @@ class OpCall implements Callable {
 
     Set getOutputs() { outputs }
 
-    static private <T> T read0(source){
+    private <T> T read0(source){
         if( source instanceof DataflowBroadcast )
-            return (T)ChannelHelper.getReadable(source)
+            return (T)session.getReadChannel(source)
 
         if( source instanceof DataflowQueue )
-            return (T)ChannelHelper.getReadable(source)
+            return (T)session.getReadChannel(source)
 
         else
             return (T)source
@@ -80,7 +106,7 @@ class OpCall implements Callable {
 
 
     protected Object invoke() {
-        final DataflowReadChannel source = read0(channel)
+        final DataflowReadChannel source = read0(source)
         final result = invoke0(source, read1(args))
         addGraphNode(result)
         return result
@@ -88,7 +114,7 @@ class OpCall implements Callable {
 
     protected void addGraphNode(Object result) {
         // infer inputs
-        inputs.add( channel )
+        inputs.add( source )
         inputs.addAll( getInputChannels() )
         outputs.addAll( getOutputChannels(result))
 

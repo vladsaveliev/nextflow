@@ -42,7 +42,7 @@ class ConcatOp {
 
 
     DataflowWriteChannel apply() {
-        final result = ChannelHelper.create()
+        final result = ChannelFactory.create()
         final allChannels = [source]
         allChannels.addAll(target)
 

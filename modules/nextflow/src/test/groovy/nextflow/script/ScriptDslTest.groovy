@@ -9,7 +9,7 @@ import test.MockScriptRunner
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-class ScriptNewSyntaxTest extends Specification {
+class ScriptDslTest extends Specification {
 
     def setupSpec() { NextflowMeta.instance.enableModules() }
     def cleanupSpec() { NextflowMeta.instance.disableModules() }

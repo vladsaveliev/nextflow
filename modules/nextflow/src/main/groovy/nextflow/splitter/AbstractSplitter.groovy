@@ -27,7 +27,7 @@ import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
 import nextflow.exception.StopSplitIterationException
-import nextflow.extension.ChannelHelper
+import nextflow.extension.ChannelFactory
 import nextflow.util.CheckHelper
 /**
  * Generic data splitter, provide main methods/interfaces
@@ -370,7 +370,7 @@ abstract class AbstractSplitter<T> implements SplitterStrategy {
      * @return Split the target object and return a channel emitting the produced chunks
      */
     DataflowWriteChannel channel() {
-        into = ChannelHelper.create()
+        into = ChannelFactory.create()
         (DataflowWriteChannel) apply()
     }
 

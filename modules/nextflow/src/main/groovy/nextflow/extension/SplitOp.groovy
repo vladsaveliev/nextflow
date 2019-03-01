@@ -103,7 +103,7 @@ class SplitOp {
         // turn off channel auto-close
         params.autoClose = false
 
-        if( params.into && !(ChannelHelper.isChannelQueue(params.into)) )
+        if( params.into && !(ChannelFactory.isChannelQueue(params.into)) )
             throw new IllegalArgumentException('Parameter `into` must reference a channel object')
 
     }
@@ -141,7 +141,7 @@ class SplitOp {
         }
 
         // -- now merge the result
-        def output = ChannelHelper.create()
+        def output = ChannelFactory.create()
         applyMergingOperator(splitted, output, indexes)
         return output
     }
@@ -205,7 +205,7 @@ class SplitOp {
             result = (DataflowWriteChannel)params.into
         }
         else {
-            result = ChannelHelper.create()
+            result = ChannelFactory.create()
         }
 
         return result

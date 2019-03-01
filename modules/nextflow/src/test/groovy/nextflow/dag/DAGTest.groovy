@@ -20,11 +20,18 @@ import groovyx.gpars.dataflow.DataflowChannel
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
 import spock.lang.Specification
+
+import nextflow.Session
+
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 class DAGTest extends Specification {
+
+    def setupSpec() {
+        new Session()
+    }
 
     def 'should create a vertex' () {
 

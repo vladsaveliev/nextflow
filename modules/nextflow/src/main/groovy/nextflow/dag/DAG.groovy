@@ -25,8 +25,8 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.operator.DataflowProcessor
+import nextflow.Global
 import nextflow.Session
-import nextflow.extension.ChannelHelper
 import nextflow.extension.DataflowHelper
 import nextflow.processor.TaskProcessor
 import nextflow.script.DefaultInParam
@@ -55,6 +55,11 @@ class DAG {
     }
 
     /**
+     * The {@link nextflow.Session} to which this DAG is bound
+     */
+    private Session session = Global.session as Session
+
+    /**
      * The list of edges in the graph
      */
     private List<Edge> edges = new ArrayList<>(50)
@@ -63,11 +68,6 @@ class DAG {
      * The ordered list of vertices
      */
     private List<Vertex> vertices = new ArrayList<>(50)
-
-    /**
-     * The {@link Session} to which this DAG is bound
-     */
-    private Session session
 
     @PackageScope
     List<Vertex> getVertices() { vertices }
@@ -200,7 +200,7 @@ class DAG {
             return true
         if( obj instanceof DataflowBroadcast )
             return true
-        return obj instanceof DataflowQueue && ChannelHelper.isBridge(obj)
+        return obj instanceof DataflowQueue && session.channelFactory.isBridge(obj)
     }
 
     private void outbound( Vertex vertex, ChannelHandler leaving) {

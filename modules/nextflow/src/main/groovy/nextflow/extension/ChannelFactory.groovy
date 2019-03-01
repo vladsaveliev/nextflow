@@ -2,6 +2,7 @@ package nextflow.extension
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
+import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
@@ -11,47 +12,32 @@ import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.stream.DataflowStreamReadAdapter
 import groovyx.gpars.dataflow.stream.DataflowStreamWriteAdapter
 import nextflow.Channel
-import nextflow.script.WorkflowScope
+import nextflow.NextflowMeta
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@Slf4j
 @CompileStatic
-class ChannelHelper {
+class ChannelFactory {
 
-    static Map<DataflowQueue, DataflowBroadcast> bridges = new HashMap<>(10)
+    private Map<DataflowQueue, DataflowBroadcast> bridges = new HashMap<>(10)
 
-    static DataflowWriteChannel createBy(DataflowReadChannel channel) {
-        create( channel instanceof DataflowExpression )
-    }
-
-    static DataflowWriteChannel create(boolean value=false) {
-        if( value )
-            return new DataflowVariable()
-
-        if( WorkflowScope.get().current() == null )
-            return new DataflowQueue()
-
-        else
-            return new DataflowBroadcast()
-    }
-
-    static DataflowReadChannel getReadable(channel) {
-        if (channel instanceof DataflowExpression)
-            return channel
-
+    DataflowReadChannel getReadChannel(channel) {
         if (channel instanceof DataflowQueue)
-            return getReadable(channel)
+            return getRead1(channel)
 
         if (channel instanceof DataflowBroadcast)
-            return getReadable(channel)
+            return getRead2(channel)
+
+        if (channel instanceof DataflowReadChannel)
+            return channel
 
         throw new IllegalArgumentException("Illegal channel source type: ${channel?.getClass()?.getName()}")
     }
 
-    static DataflowReadChannel getReadable(DataflowQueue queue) {
-        def workflow = WorkflowScope.get().current()
-        if( workflow==null )
+    private DataflowReadChannel getRead1(DataflowQueue queue) {
+        if( !NextflowMeta.is_DSL_2() )
             return queue
 
         def broadcast = bridges.get(queue)
@@ -62,21 +48,20 @@ class ChannelHelper {
         return broadcast.createReadChannel()
     }
 
-    static DataflowReadChannel getReadable(DataflowBroadcast channel) {
-        def workflow = WorkflowScope.get().current()
-        if( workflow==null )
+    private DataflowReadChannel getRead2(DataflowBroadcast channel) {
+        if( !NextflowMeta.is_DSL_2() )
             throw new IllegalStateException("Broadcast channel are only allowed in a workflow definition scope")
-
         channel.createReadChannel()
     }
 
-    static boolean isBridge(DataflowQueue queue) {
+    boolean isBridge(DataflowQueue queue) {
         bridges.get(queue) != null
     }
 
-    static void broadcast() {
+    void broadcast() {
         // connect all dataflow queue variables to associated broadcast channel 
         for( DataflowQueue queue : bridges.keySet() ) {
+            log.debug "Bridging dataflow queue=$queue"
             def broadcast = bridges.get(queue)
             queue.into(broadcast)
         }
@@ -92,6 +77,20 @@ class ChannelHelper {
             source.bind(Channel.STOP)
         }
         return source
+    }
+
+    static DataflowWriteChannel createBy(DataflowReadChannel channel) {
+        create( channel instanceof DataflowExpression )
+    }
+
+    static DataflowWriteChannel create(boolean value=false) {
+        if( value )
+            return new DataflowVariable()
+
+        if( NextflowMeta.is_DSL_2() )
+            return new DataflowBroadcast()
+
+        return new DataflowQueue()
     }
 
     static boolean isChannel(obj) {

@@ -952,4 +952,28 @@ class FileHelper {
         throw new NoSuchFileException(FilesEx.toUriString(result))
     }
 
+
+    /**
+     *
+     * @param script
+     * @return
+     */
+    static String getIdentifier(Path script, String prefix=null) {
+        final char UNDERSCORE = '_'
+        def str = FilesEx.getSimpleName(script)
+        StringBuilder normalised = new StringBuilder()
+        for( int i=0; i<str.length(); i++ ) {
+            final char ch = str.charAt(i)
+            final valid = i==0 ? Character.isJavaIdentifierStart(ch) : Character.isJavaIdentifierPart(ch)
+            normalised.append( valid ? ch : UNDERSCORE )
+        }
+
+        def result = prefix ? prefix + normalised : normalised.toString()
+        while(result.contains('__')) {
+            result = result.replace(/__/,'_')
+        }
+        return result
+    }
+
+
 }

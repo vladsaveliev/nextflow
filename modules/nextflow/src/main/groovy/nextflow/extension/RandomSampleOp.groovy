@@ -79,7 +79,7 @@ class RandomSampleOp {
     }
 
     DataflowWriteChannel apply() {
-        result = ChannelHelper.create()
+        result = ChannelFactory.create()
         subscribeImpl(source, eventsMap(this.&sampling, this.&emit))
         return result
     }

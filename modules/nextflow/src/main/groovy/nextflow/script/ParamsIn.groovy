@@ -25,9 +25,11 @@ import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.expression.DataflowExpression
+import nextflow.Global
 import nextflow.Nextflow
+import nextflow.Session
 import nextflow.exception.ProcessException
-import nextflow.extension.ChannelHelper
+import nextflow.extension.ChannelFactory
 import nextflow.extension.ToListOp
 /**
  * Base class for input/output parameters
@@ -151,6 +153,8 @@ interface InParam {
 @Slf4j
 abstract class BaseInParam extends BaseParam implements InParam {
 
+    private Session session = Global.session as Session
+
     protected fromObject
 
     protected bindObject
@@ -193,7 +197,7 @@ abstract class BaseInParam extends BaseParam implements InParam {
         }
 
         if ( value instanceof DataflowReadChannel || value instanceof DataflowBroadcast )  {
-            return ChannelHelper.getReadable(value)
+            return session.getReadChannel(value)
         }
 
         // wrap any collections with a DataflowQueue
@@ -288,9 +292,9 @@ abstract class BaseInParam extends BaseParam implements InParam {
     }
 
     Object getRawChannel() {
-        if( ChannelHelper.isChannel(fromObject) )
+        if( ChannelFactory.isChannel(fromObject) )
             return fromObject
-        if( ChannelHelper.isChannel(inChannel) )
+        if( ChannelFactory.isChannel(inChannel) )
             return inChannel
         throw new IllegalStateException("Missing input channel")
     }

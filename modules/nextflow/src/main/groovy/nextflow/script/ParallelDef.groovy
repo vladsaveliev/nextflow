@@ -13,6 +13,8 @@ class ParallelDef implements ComponentDef {
         return this
     }
 
+    String getType() { 'parallel' }
+
     @Override
     String getName() {
         return "( ${elements.collect{ it.name }.join(' | ')} )"

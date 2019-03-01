@@ -31,9 +31,7 @@ class ScriptPipesTest extends Specification {
               result = data.toUpperCase()
         } 
 
-        workflow {
-           Channel.from('Hello') >> (foo | bar)
-        }
+         Channel.from('Hello') | map { it.reverse() } | (foo & bar)
         '''
 
         when:
@@ -41,8 +39,8 @@ class ScriptPipesTest extends Specification {
         def result = runner.setScript(SCRIPT).execute()
 
         then:
-        result[0].val == 'Hello mundo'
-        result[1].val == 'HELLO'
+        result[0].val == 'olleH mundo'
+        result[1].val == 'OLLEH'
     }
 
 }

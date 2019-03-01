@@ -16,17 +16,18 @@
 
 package nextflow.script
 
-
 import groovy.transform.CompileStatic
-import groovyx.gpars.dataflow.DataflowQueue
-import groovyx.gpars.dataflow.DataflowVariable
+import nextflow.Global
 import nextflow.Session
+import nextflow.extension.ChannelFactory
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
 class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
+
+    private Session session = Global.session as Session
 
     private BaseScript owner
 
@@ -36,8 +37,6 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
 
     private TaskBody taskBody
 
-    private Session session
-
     private Object output
 
     ProcessDef(BaseScript owner, String name, ProcessConfig config, TaskBody body) {
@@ -45,7 +44,6 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
         this.name = name
         this.taskBody = body
         this.processConfig = config
-        this.session = owner.binding.session
     }
 
     ProcessDef clone() {
@@ -64,6 +62,8 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
     String getName() { name }
 
     def getOutput() { output }
+
+    String getType() { 'process' }
 
     Object invoke(Object[] args, Binding scope) {
         // use this instance an workflow template, therefore clone it
@@ -100,8 +100,8 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
             final singleton = allScalarValues && !hasEachParams
 
             for(int i=0; i<declaredOutputs.size(); i++ ) {
-                def ch = singleton ? new DataflowVariable<>() : new DataflowQueue<>()
-                result[i] = ch
+                final ch = ChannelFactory.create(singleton)
+                result[i] = ch 
                 declaredOutputs[i].into(ch)
             }
         }

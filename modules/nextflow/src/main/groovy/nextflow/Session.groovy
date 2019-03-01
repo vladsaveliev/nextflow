@@ -32,6 +32,7 @@ import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.GParsConfig
+import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.config.Manifest
 import nextflow.container.ContainerConfig
@@ -41,6 +42,7 @@ import nextflow.exception.AbortSignalException
 import nextflow.exception.IllegalConfigException
 import nextflow.exception.MissingLibraryException
 import nextflow.executor.ExecutorFactory
+import nextflow.extension.ChannelFactory
 import nextflow.file.FileHelper
 import nextflow.file.FilePorter
 import nextflow.processor.ErrorStrategy
@@ -86,10 +88,14 @@ class Session implements ISession {
      */
     final Collection<DataflowProcessor> allOperators = new ConcurrentLinkedQueue<>()
 
+    final List<Closure> igniters = new ArrayList<>(10)
+
     /**
      * Creates process executors
      */
     ExecutorFactory executorFactory
+
+    ChannelFactory channelFactory
 
     /**
      * Script binding
@@ -315,7 +321,7 @@ class Session implements ISession {
         log.debug "Executor pool size: ${poolSize}"
 
         // -- DAG object
-        this.dag = new DAG(session:this)
+        this.dag = new DAG()
 
         // -- init work dir
         this.workDir = ((config.workDir ?: 'work') as Path).complete()
@@ -323,6 +329,7 @@ class Session implements ISession {
 
         // -- file porter config
         this.filePorter = new FilePorter(this)
+        this.channelFactory = new ChannelFactory()
     }
 
     /**
@@ -504,6 +511,30 @@ class Session implements ISession {
         Signal.handle( new Signal("HUP"), abort_h)
     }
 
+    void addIgniter( Closure action )  {
+        igniters.add(action)
+    }
+
+    void fireDataflowNetwork() {
+        if( !NextflowMeta.instance.isModuleEnabled() )
+            return
+
+        // bridge any dataflow queue into a broadcast channel
+        channelFactory.broadcast()
+
+        log.debug "Ignite dataflow network (${igniters.size()})"
+        for( def action : igniters ) {
+            try {
+                action.call()
+            }
+            catch( Exception e ) {
+                log.error(e.message ?: "Failed to trigger dataflow network", e)
+                abort(e)
+                break
+            }
+        }
+    }
+
     /**
      * Dump the current dataflow network listing
      * the status of active processes and operators
@@ -520,6 +551,9 @@ class Session implements ISession {
         }
     }
 
+    DataflowReadChannel getReadChannel(source) {
+        channelFactory.getReadChannel(source)
+    }
 
     Session start() {
         log.debug "Session start invoked"

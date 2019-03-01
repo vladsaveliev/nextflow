@@ -61,8 +61,8 @@ class PhaseOp {
 
     DataflowWriteChannel apply() {
 
-        def result = ChannelHelper.create()
-        def state = [:]
+        def result = ChannelFactory.create()
+        def state = new LinkedHashMap()
 
         final count = 2
         final stopCount = new AtomicInteger(count)

@@ -47,7 +47,8 @@ for example::
     def fib( x ) {
         if( x <= 1 )
             return x
-        fib(x-1) + fib(x-2)
+        else
+            fib(x-1) + fib(x-2)
     }
 
 Process
@@ -59,8 +60,8 @@ Once the `module` feature is enabled `process` components can be defined followi
 for :ref:`process-page` definition expect you will need to omit that definition of the ``from`` and ``into``
 channel declarations.
 
-Then processes can be invoked as a function in the ``workflow`` scope, passing as parameter the expected
-input channel. 
+Then processes can be invoked as a function passing as parameter(s) the expected
+input channel(s).
 
 For example::
 
@@ -86,11 +87,9 @@ For example::
           """
     }
 
-    workflow {
-        data = Channel.fromPath('/some/path/*.txt')
-        FOO()
-        BAR(data)
-    }
+    data = Channel.fromPath('/some/path/*.txt')
+    FOO()
+    BAR(data)
 
 
 Process invocation
@@ -104,9 +103,7 @@ Processes having matching input-output declaration can be composed so that the o
 of the first process is passed as input to the following process. Take in consideration
 the previous process definition, it's possible to write the following::
 
-    workflow {
-        BAR(FOO())
-    }
+    BAR(FOO())
 
 Process outputs
 ---------------
@@ -114,11 +111,10 @@ Process outputs
 A process output can also be accessed using the ``output`` attribute for the respective
 process object. For example::
 
-    workflow {
-        FOO()
-        BAR( FOO.output )
-        BAR.output.println()
-    }
+    FOO()
+    BAR( FOO.output )
+    BAR.output.println()
+
 
 When a process defines two or more output channels, each of them can be accessed
 using the array element operator e.g. ``output[0]``, etc or using the `first`, ``second``, etc
@@ -170,10 +166,10 @@ can be included and shared across workflow applications.
 A library script can contain the definition of functions, processes and workflows definition
 as described above.
 
-Library require
+Library include
 ---------------
 
-The library script can be imported from another Nextflow script using the ``require`` statement.
+The library script can be imported from another Nextflow script using the ``include`` statement.
 This allows the reference of the functions, processes and workflows defined in the library from
 the importing script. 
 
@@ -181,12 +177,40 @@ For example::
 
     nextflow.enable.modules = true
 
-    require 'modules/library.nf'
+    include 'modules/libx'
 
-    workflow {
-        data = Channel.fromPath('/some/data/*.txt')
-        MY_PIPELINE(data)
-    }
+    data = Channel.fromPath('/some/data/*.txt')
+    libx.MY_PIPELINE(data)
+
+Nextflow implicitly looks for the library script ``modules/libx.nf`` resolving the path
+against the main script location.
+
+Library namespace
+-----------------
+
+The library inclusion implicitly defines a *namespace* with the name name as the library script
+e.g. ``libx`` in the previous example. Library components (i.e. functions, processes and workflows)
+can be accessed by prefixing them with the library prefix e.g. ``libx.TASK_FOO``.
+
+A different namespace can be specified using the ``as`` keyword. For example::
+
+    nextflow.enable.modules = true
+
+    include 'modules/libx' as helpers
+
+    data = Channel.fromPath('/some/data/*.txt')
+    helpers.MY_PIPELINE(data)
+
+The special ``_`` namespace can be used to import library components in the script default
+namespace. For example::
+
+
+    nextflow.enable.modules = true
+
+    include 'modules/libx' as _
+
+    data = Channel.fromPath('/some/data/*.txt')
+    MY_PIPELINE(data)
 
 
 Library parameters
@@ -204,10 +228,50 @@ A library script can define script parameters as any other Nextflow script.
     }
 
 
-Then, parameters can be specified when the library is imported with the `require` statement::
+Then, parameters can be specified when the library is imported with the ``include`` statement::
 
 
     nextflow.enable.modules = true
 
-    require 'modules/library.nf', params: [foo: 'Hola', bar: 'mundo']
+    include 'modules/library.nf' params(foo: 'Hola', bar: 'mundo')
 
+
+Pipes
+=====
+
+Nextflow processes and operators can be composed using the ``|`` *pipe* operator. For example::
+
+      process FOO {
+          input: val data
+          output: val result
+          exec:
+            result = "$data mundo"
+      }
+
+      data = Channel.from('Hello','world')
+
+      data | FOO
+
+
+The above snippet defines a process named ``FOO`` then invoke it passing the content of the
+``data`` channel.
+
+The ``&`` *and* operator allow to feed two or more processes with the content of the same
+channel e.g.::
+
+      process FOO {
+          input: val data
+          output: val result
+          exec:
+            result = "$data mundo"
+        }
+
+        process BAR {
+            input: val data
+            output: val result
+            exec:
+              result = data.toUpperCase()
+        }
+
+
+        Channel.from('Hello') | map { it.reverse() } | (FOO & BAR)

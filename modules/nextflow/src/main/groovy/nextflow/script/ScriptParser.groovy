@@ -16,7 +16,6 @@
 
 package nextflow.script
 
-
 import java.nio.file.Path
 
 import com.google.common.hash.Hashing
@@ -26,6 +25,7 @@ import nextflow.Nextflow
 import nextflow.Session
 import nextflow.ast.NextflowDSL
 import nextflow.ast.NextflowXform
+import nextflow.file.FileHelper
 import nextflow.util.Duration
 import nextflow.util.MemoryUnit
 import org.apache.commons.lang.StringUtils
@@ -117,22 +117,9 @@ class ScriptParser {
      */
     protected String computeClassName(script) {
         final PREFIX = 'Script_'
-        final char UNDERSCORE = '_'
 
         if( script instanceof Path ) {
-            def str = script.getSimpleName()
-            StringBuilder normalised = new StringBuilder(PREFIX)
-            for( int i=0; i<str.length(); i++ ) {
-                final char ch = str.charAt(i)
-                final valid = i==0 ? Character.isJavaIdentifierStart(ch) : Character.isJavaIdentifierPart(ch)
-                normalised.append( valid ? ch : UNDERSCORE )
-            }
-
-            def result = normalised.toString()
-            while(result.contains('__')) {
-                result = result.replace(/__/,'_')
-            }
-            return result
+            return FileHelper.getIdentifier(script,PREFIX)
         }
 
         if( script instanceof CharSequence ) {
@@ -159,8 +146,9 @@ class ScriptParser {
     ScriptParser parse(String scriptText, GroovyShell interpreter) {
         final clazzName = computeClassName(scriptText)
         script = (BaseScript)interpreter.parse(scriptText, clazzName)
-        if( scriptPath )
-            ScriptMeta.get(script).scriptPath = scriptPath
+        final meta = ScriptMeta.get(script)
+        meta.setScriptPath(scriptPath)
+        meta.setModule(module)
         return this
     }
 

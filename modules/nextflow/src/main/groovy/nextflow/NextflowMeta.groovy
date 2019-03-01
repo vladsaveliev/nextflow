@@ -13,6 +13,8 @@ import nextflow.util.VersionNumber
 @EqualsAndHashCode
 class NextflowMeta {
 
+    static boolean is_DSL_2() { NextflowMeta.instance.isModuleEnabled() }
+
     final VersionNumber version
     final int build
     final String timestamp

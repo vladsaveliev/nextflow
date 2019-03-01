@@ -6,7 +6,6 @@ import java.nio.file.Paths
 
 import nextflow.Session
 import test.TestHelper
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>

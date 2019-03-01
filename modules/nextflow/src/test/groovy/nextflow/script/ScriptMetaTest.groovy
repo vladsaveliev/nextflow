@@ -2,8 +2,10 @@ package nextflow.script
 
 import spock.lang.Specification
 
-import groovy.transform.InheritConstructors
+import java.nio.file.Paths
 
+import groovy.transform.InheritConstructors
+import nextflow.exception.DuplicateScriptDefinitionException
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -26,18 +28,7 @@ class ScriptMetaTest extends Specification {
         def func1 = new FunctionDef(name: 'func1')
         def work1 = new WorkflowDef(Mock(TaskBody), 'work1')
 
-
-        def inc_p1 = new ProcessDef(script, 'inc_p1', Mock(ProcessConfig), Mock(TaskBody))
-        def inc_f1 = new FunctionDef(name: 'inc_func1')
-        def inc_f2 = new FunctionDef(name: 'inc_func2')
-        def inc_w1 = new WorkflowDef(Mock(TaskBody), 'inc_w1')
-        def inc_w2 = new WorkflowDef(Mock(TaskBody), 'inc_w2')
-
-        def includes = Mock(ScriptIncludes)
-        includes.getDefinitions() >> [inc_p1, inc_f1, inc_f2, inc_w1, inc_w2 ]
-
         def meta = new ScriptMeta(script)
-        meta.setScriptIncludes(includes)
 
         when:
         meta.addDefinition(func1)
@@ -46,47 +37,123 @@ class ScriptMetaTest extends Specification {
         meta.addDefinition(proc2)
 
         then:
-        meta.getDefinition('work1') == work1
-        meta.getDefinition('func1') == func1
-        meta.getDefinition('proc1') == proc1
-        meta.getDefinition('proc2') == proc2
-        meta.getDefinition('inc_p1') == null
-        meta.getDefinition('inc_w2') == null
-
-        then:
         meta.getInvokable('work1') == work1
+        meta.getInvokable('func1') == func1
         meta.getInvokable('proc1') == proc1
-        meta.getInvokable('inc_p1') == inc_p1
-        meta.getInvokable('inc_w2') == inc_w2
+        meta.getInvokable('proc2') == proc2
+        meta.getInvokable('xxx') == null
+        meta.getInvokable('yyy') == null
 
         then:
-        meta.getAllDefinedNames() == ['proc1','proc2','func1','work1'] as Set
+        meta.getProcessNames() as Set == ['proc1','proc2'] as Set
+
+    }
+
+    def 'should add imports' () {
+
+        given:
+        def script1 = new FooScript(new ScriptBinding())
+        def script2 = new FooScript(new ScriptBinding())
+        def script3 = new FooScript(new ScriptBinding())
+        def meta1 = new ScriptMeta(script1)
+        def meta2 = new ScriptMeta(script2)
+        def meta3 = new ScriptMeta(script3)
+
+        // defs in the root script
+        def proc1 = new ProcessDef(script1, 'proc1', Mock(ProcessConfig), Mock(TaskBody))
+        def func1 = new FunctionDef(name: 'func1')
+        def work1 = new WorkflowDef(Mock(TaskBody), 'work1')
+        meta1.addDefinition(proc1, func1, work1)
+
+        // defs in the second script imported in the root namespace
+        def proc2 = new ProcessDef(script2, 'proc2', Mock(ProcessConfig), Mock(TaskBody))
+        def func2 = new FunctionDef(name: 'func2')
+        def work2 = new WorkflowDef(Mock(TaskBody), 'work2')
+        meta2.addDefinition(proc2, func2, work2)
+
+        // defs in the third script imported in a separate namespace
+        def proc3 = new ProcessDef(script2, 'proc3', Mock(ProcessConfig), Mock(TaskBody))
+        def func3 = new FunctionDef(name: 'func3')
+        def work3 = new WorkflowDef(Mock(TaskBody), 'work2')
+        meta3.addDefinition(proc3, func3, work3)
+
+        when:
+        meta1.addModule('_', meta2)
+        meta1.addModule('modx', meta3)
 
         then:
-        meta.containsDef('proc1')
-        meta.containsDef('proc2')
-        meta.containsDef('func1')
-        meta.containsDef('work1')
-        !meta.containsDef('proc3')
+        meta1.getDefinitions() as Set == [proc1, func1, work1] as Set
+        meta1.getInvokable('proc1') == proc1
+        meta1.getInvokable('func1') == func1
+        meta1.getInvokable('work1') == work1
 
         then:
-        meta.getDefinedProcesses() == [proc1, proc2]
-        meta.getDefinedWorkflows() == [work1]
-        meta.getDefinedFunctions() == [func1]
+        // from root namespace
+        meta1.getInvokable('proc2') == proc2
+        meta1.getInvokable('func2') == func2
+        meta1.getInvokable('work2') == work2
 
         then:
-        meta.getFunctions() == [func1, inc_f1, inc_f2] as Set
-        meta.getWorkflows() == [work1, inc_w1, inc_w2] as Set
-        meta.getProcesses() == [proc1, proc2, inc_p1] as Set
-        meta.getProcessNames() == ['proc1','proc2', 'inc_p1'] as Set
+        // other namespace are not reachable
+        meta1.getInvokable('proc3') == null
+        meta1.getInvokable('work3') == null
+        meta1.getInvokable('func3') == null
+        meta1.getInvokable('xxx') == null
 
         then:
-        meta.getProcess('proc1') == proc1
-        meta.getProcess('inc_p1') == inc_p1
-        meta.getProcess('foo') == null
-        meta.getWorkflow('work1') == work1
-        meta.getWorkflow('inc_w1') == inc_w1
-        meta.getWorkflow('func1') == null
+        meta1.getProcessNames() == ['proc1','proc2','modx.proc3'] as Set
+    }
+
+
+    def 'should check collision' () {
+
+        given:
+        def proc1 = new ProcessDef(Mock(BaseScript), 'proc1', Mock(ProcessConfig), Mock(TaskBody))
+        def func1 = new FunctionDef(name: 'func1')
+        def work1 = new WorkflowDef(Mock(TaskBody), 'work1')
+
+        def script1 = new FooScript(new ScriptBinding())
+        def meta1 = new ScriptMeta(script1)
+        meta1.addDefinition(proc1, func1, work1)
+
+        // add a not colliding process
+        when:
+        def proc = new ProcessDef(Mock(BaseScript), 'FOO', Mock(ProcessConfig), Mock(TaskBody))
+        def reqScript = new FooScript(new ScriptBinding())
+        def reqMeta = new ScriptMeta(reqScript)
+        reqMeta.addDefinition(proc)
+        meta1.checkNamespaceCollision('_', reqMeta)
+
+        then:
+        noExceptionThrown()
+
+        // add a process with a name already used
+        when:
+        proc = new ProcessDef(Mock(BaseScript), 'proc1', Mock(ProcessConfig), Mock(TaskBody))
+        reqScript = new FooScript(new ScriptBinding())
+        reqMeta = new ScriptMeta(reqScript)
+        reqMeta.addDefinition(proc)
+        reqMeta.scriptPath = Paths.get('/foo/script.nf')
+        meta1.checkNamespaceCollision('_', reqMeta)
+
+        then:
+        def err = thrown(DuplicateScriptDefinitionException)
+        err.message == "Required module contains a process with name 'proc1' already defined in the root namespace -- check script: /foo/script.nf"
+
+
+        // add a module using a new name space
+        when:
+        meta1.checkNamespaceCollision('ns1', reqMeta)
+        then:
+        noExceptionThrown()
+
+        // add a module using the same namespace
+        when:
+        meta1.imports.put('ns2', Mock(ScriptMeta))
+        meta1.checkNamespaceCollision('ns2', reqMeta)
+        then:
+        err = thrown(DuplicateScriptDefinitionException)
+        err.message == "A module with name 'ns2' was already imported"
 
     }
 }

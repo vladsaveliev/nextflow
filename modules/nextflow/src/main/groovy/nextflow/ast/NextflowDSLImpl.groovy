@@ -18,7 +18,9 @@ package nextflow.ast
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
+import nextflow.extension.OperatorEx
 import nextflow.script.BaseScript
+import nextflow.script.IncludeDef
 import nextflow.script.TaskBody
 import nextflow.script.TaskClosure
 import nextflow.script.TokenEnvCall
@@ -36,6 +38,7 @@ import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.VariableScope
 import org.codehaus.groovy.ast.expr.ArgumentListExpression
 import org.codehaus.groovy.ast.expr.BinaryExpression
+import org.codehaus.groovy.ast.expr.CastExpression
 import org.codehaus.groovy.ast.expr.ClosureExpression
 import org.codehaus.groovy.ast.expr.ConstantExpression
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression
@@ -60,6 +63,7 @@ import org.codehaus.groovy.syntax.SyntaxException
 import org.codehaus.groovy.syntax.Types
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
+import static org.codehaus.groovy.ast.tools.GeneralUtils.constX
 /**
  * Implement some syntax sugars of Nextflow DSL scripting.
  *
@@ -71,13 +75,17 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 @GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class NextflowDSLImpl implements ASTTransformation {
 
-    static private Set<String> RESERVED_NAMES = ['main','run','runScript'] as Set
+    static private Set<String> RESERVED_NAMES
 
     static {
+        // method names implicitly defined by the groovy script SHELL
+        RESERVED_NAMES = ['main','run','runScript'] as Set
         // existing method cannot be used for custom script definition
         for( def method : BaseScript.getMethods() ) {
             RESERVED_NAMES.add(method.name)
         }
+        // add the built-in operator as reserved names
+        RESERVED_NAMES.addAll( OperatorEx.OPERATOR_NAMES )
     }
 
     @Override
@@ -127,6 +135,7 @@ class NextflowDSLImpl implements ASTTransformation {
             super.visitMethod(node)
         }
 
+
         @Override
         void visitMethodCallExpression(MethodCallExpression methodCall) {
             // pre-condition to be verified to apply the transformation
@@ -153,11 +162,54 @@ class NextflowDSLImpl implements ASTTransformation {
                 convertWorkflowDef(methodCall,sourceUnit)
                 super.visitMethodCallExpression(methodCall)
             }
+
             // just apply the default behavior
             else {
                 super.visitMethodCallExpression(methodCall)
             }
 
+        }
+
+        @Override
+        void visitExpressionStatement(ExpressionStatement stm) {
+            if( stm.text.startsWith('this.include(') && stm.getExpression() instanceof MethodCallExpression )  {
+                final methodCall = (MethodCallExpression)stm.getExpression()
+                convertIncludeDef(methodCall)
+                // this is necessary to invoke the `load` method on the include definition
+                final loadCall = new MethodCallExpression(methodCall, 'load', new ArgumentListExpression())
+                stm.setExpression(loadCall)
+            }
+            super.visitExpressionStatement(stm)
+        }
+
+        protected void convertIncludeDef(MethodCallExpression call) {
+            if( call.methodAsString=='include' && call.arguments instanceof ArgumentListExpression ) {
+                final allArgs = (ArgumentListExpression)call.arguments
+                if( allArgs.size() != 1 ) {
+                    syntaxError(call, "Not a valid include definition -- it must specify the module path")
+                    return
+                }
+
+                final arg = allArgs[0]
+                final newArgs = new ArgumentListExpression()
+                if( arg instanceof ConstantExpression ) {
+                    newArgs.addExpression( newObj(IncludeDef, arg) )
+                }
+                else if( arg instanceof CastExpression && arg.getExpression() instanceof ConstantExpression) {
+                    def cast = (CastExpression)arg
+                    final module = (ConstantExpression)cast.expression
+                    final ns = constX(cast.type.name)
+                    newArgs.addExpression( newObj(IncludeDef, module, ns) )
+                }
+                else {
+                    syntaxError(call, "Not a valid include definition -- it must specify the module path as a string")
+                    return
+                }
+                call.setArguments(newArgs)
+            }
+            else if( call.objectExpression instanceof MethodCallExpression ) {
+                convertIncludeDef((MethodCallExpression)call.objectExpression)
+            }
         }
 
         /*
@@ -228,7 +280,7 @@ class NextflowDSLImpl implements ASTTransformation {
 
             final body = (ClosureExpression)args[len-1]
             newArgs.addExpression( makeWorkflowBodyWrapper(body) )
-            newArgs.addExpression( GeneralUtils.constX(name) )
+            newArgs.addExpression( constX(name) )
             newArgs.addExpression( makeArgsList(args) )
 
             // set the new list as the new arguments

@@ -61,21 +61,21 @@ class WorkflowDefTest extends Specification {
         def script = (TestScript)new GroovyShell(config).parse(SCRIPT).run()
         def meta = ScriptMeta.get(script)
         then:
-        meta.definedWorkflows.size() == 4
-        meta.getDefinedWorkflow('alpha') .declaredInputs == []
-        meta.getDefinedWorkflow('alpha') .declaredVariables == []
-        meta.getDefinedWorkflow('alpha') .source.stripIndent() == "print 'Hello world'\n"
+        meta.definitions.size() == 4
+        meta.getWorkflow('alpha') .declaredInputs == []
+        meta.getWorkflow('alpha') .declaredVariables == []
+        meta.getWorkflow('alpha') .source.stripIndent() == "print 'Hello world'\n"
 
-        meta.getDefinedWorkflow('bravo') .declaredInputs == ['foo', 'bar']
-        meta.getDefinedWorkflow('bravo') .declaredVariables == []
-        meta.getDefinedWorkflow('bravo') .source.stripIndent() == "print foo\nprint bar\nreturn foo+bar\n"
+        meta.getWorkflow('bravo') .declaredInputs == ['foo', 'bar']
+        meta.getWorkflow('bravo') .declaredVariables == []
+        meta.getWorkflow('bravo') .source.stripIndent() == "print foo\nprint bar\nreturn foo+bar\n"
 
-        meta.getDefinedWorkflow('delta') .declaredInputs == ['foo']
-        meta.getDefinedWorkflow('delta') .declaredVariables == ['bar']
+        meta.getWorkflow('delta') .declaredInputs == ['foo']
+        meta.getWorkflow('delta') .declaredVariables == ['bar']
 
-        meta.getDefinedWorkflow('empty') .source == ''
-        meta.getDefinedWorkflow('empty') .declaredInputs == []
-        meta.getDefinedWorkflow('empty') .declaredVariables == []
+        meta.getWorkflow('empty') .source == ''
+        meta.getWorkflow('empty') .declaredInputs == []
+        meta.getWorkflow('empty') .declaredVariables == []
     }
 
     def 'should define anonymous workflow' () {
@@ -97,7 +97,7 @@ class WorkflowDefTest extends Specification {
         def script = (TestScript)new GroovyShell(binding, config).parse(SCRIPT).run()
         def meta = ScriptMeta.get(script)
         then:
-        meta.getDefinedWorkflow(null).getSource().stripIndent() == 'print 1\nprint 2\n'
+        meta.getWorkflow(null).getSource().stripIndent() == 'print 1\nprint 2\n'
 
     }
 
@@ -118,7 +118,7 @@ class WorkflowDefTest extends Specification {
 
         when:
         def script = (TestScript)new GroovyShell(config).parse(SCRIPT).run()
-        def workflow = ScriptMeta.get(script).getDefinedWorkflow('alpha')
+        def workflow = ScriptMeta.get(script).getWorkflow('alpha')
         then:
         workflow.declaredInputs == ['x']
 

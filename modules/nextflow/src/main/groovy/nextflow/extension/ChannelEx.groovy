@@ -25,11 +25,11 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
 import nextflow.Global
+import nextflow.NextflowMeta
 import nextflow.dag.NodeMarker
 import nextflow.script.ComponentDef
 import nextflow.script.ParallelDef
-import nextflow.script.WorkflowDef
-import nextflow.script.WorkflowScope
+import nextflow.script.ExecutionScope
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -39,7 +39,7 @@ import nextflow.script.WorkflowScope
 class ChannelEx {
 
     static boolean isChannelQueue(DataflowReadChannel ch) {
-        ChannelHelper.isChannelQueue(ch)
+        ChannelFactory.isChannelQueue(ch)
     }
 
     /**
@@ -105,7 +105,7 @@ class ChannelEx {
     @Deprecated
     static DataflowWriteChannel close(DataflowWriteChannel source) {
         log.warn "The `close` operator is deprecated -- it will be removed in a future release"
-        return ChannelHelper.close0(source)
+        return ChannelFactory.close0(source)
     }
 
     /**
@@ -126,25 +126,33 @@ class ChannelEx {
 
     }
 
-    static private WorkflowDef checkScope() {
-        def scope = WorkflowScope.get().current()
+    static private Binding checkContext(String method, Object operand) {
+        if( !NextflowMeta.is_DSL_2() )
+            throw new MissingMethodException(method, operand.getClass())
+
+        def scope = ExecutionScope.context()
         if( scope == null ) throw new IllegalArgumentException("Process invocation are only allowed within a workflow context")
         return scope
     }
 
-    static Object rightShift( DataflowWriteChannel left, ComponentDef right ) {
-        def scope = checkScope()
-        return right.invoke(left, scope.context)
+    static Object or( DataflowWriteChannel left, ComponentDef right ) {
+        def context = checkContext('or', left)
+        return right.invoke(left, context)
     }
 
-    static ParallelDef or(ComponentDef def1, ComponentDef def2) {
-        checkScope()
-        return new ParallelDef().add(def1).add(def2)
+    static Object or( DataflowWriteChannel left, OpCall operator ) {
+        checkContext('or', left)
+        operator.setSource(left).call()
     }
 
-    static or(ParallelDef def1, ComponentDef def2) {
-        checkScope()
-        def1.add(def2)
+    static ParallelDef and(ComponentDef left, ComponentDef right) {
+        checkContext('and', left)
+        return new ParallelDef().add(left).add(right)
+    }
+
+    static ParallelDef and(ParallelDef left, ComponentDef right) {
+        checkContext('and', left)
+        left.add(right)
     }
 
 }

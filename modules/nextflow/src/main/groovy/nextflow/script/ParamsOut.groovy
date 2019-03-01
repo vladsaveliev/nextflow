@@ -24,7 +24,7 @@ import groovy.util.logging.Slf4j
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.exception.IllegalFileException
-import nextflow.extension.ChannelHelper
+import nextflow.extension.ChannelFactory
 import nextflow.file.FilePatternSplitter
 import nextflow.util.BlankSeparatedList
 /**
@@ -174,7 +174,7 @@ abstract class BaseOutParam extends BaseParam implements OutParam {
                 }
 
                 // instantiate the new channel
-                channel = ChannelHelper.create( singleton && mode==BasicMode.standard )
+                channel = ChannelFactory.create( singleton && mode==BasicMode.standard )
 
                 // bind it to the script on-fly
                 if( local != '-' && binding ) {

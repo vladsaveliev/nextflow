@@ -8,11 +8,13 @@ import org.codehaus.groovy.runtime.InvokerHelper
  */
 trait InvokableDef {
 
+    abstract String getType()
+
     abstract String getName()
 
     abstract Object invoke(Object[] args, Binding binding)
 
     Object invoke(Object args, Binding binding=null) {
-        invoke(InvokerHelper.asArray(args),binding)
+        invoke(InvokerHelper.asArray(args), binding)
     }
 }

@@ -6,13 +6,13 @@ import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
-import nextflow.extension.ChannelHelper
+import nextflow.extension.ChannelFactory
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
+class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Cloneable {
 
     private String name
 
@@ -25,7 +25,7 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
     // -- following attributes are mutable and instance dependant
     // -- therefore should not be cloned
 
-    private Binding context
+    private Binding binding
 
     private output
 
@@ -54,7 +54,9 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
 
     @PackageScope List<String> getDeclaredVariables() { new ArrayList<String>(variableNames) }
 
-    Binding getContext() { context }
+    Binding getBinding() { binding }
+
+    String getType() { 'workflow' }
 
     private Set<String> getVarNames0() {
         def variableNames = body.getValNames()
@@ -103,10 +105,10 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
     }
 
     private List asChannel(List list) {
-        final allScalar = ChannelHelper.allScalar(list)
+        final allScalar = ChannelFactory.allScalar(list)
         for( int i=0; i<list.size(); i++ ) {
             def el = list[i]
-            if( !ChannelHelper.isChannel(el) ) {
+            if( !ChannelFactory.isChannel(el) ) {
                 list[i] = asChannel(el, allScalar)
             }
         }
@@ -133,7 +135,7 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
         // use this instance an workflow template, therefore clone it
         final workflow = this.clone()
         // workflow execution
-        WorkflowScope.get().push(workflow)
+        ExecutionScope.push(workflow)
         try {
             final result = workflow.run0(args)
             // register this workflow invocation in the current scope
@@ -143,21 +145,19 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
             return result
         }
         finally {
-            WorkflowScope.get().pop()
+            ExecutionScope.pop()
         }
 
     }
 
-    private getProcessOrWorkflowOrFail(String name) {
+    private ComponentDef getProcessOrWorkflowOrFail(String name) {
         final meta = ScriptMeta.current()
         if( !meta )
             return null
-        def result = meta.getProcess(name)
-        if( !result )
-            result = meta.getWorkflow(name)
-        if( !result )
-            throw new MissingPropertyException("Not such property: $name in workflow execution context")
-        return result
+        def result = meta.getInvokable(name)
+        if( result instanceof ComponentDef )
+            return result
+        throw new MissingPropertyException("Not such property: $name in workflow execution context")
     }
 
     private Binding createBinding() {
@@ -176,12 +176,12 @@ class WorkflowDef implements InvokableDef, ComponentDef, Cloneable {
 
     protected Object run0(Object[] args) {
         // setup the execution context
-        context = createBinding()
+        binding = createBinding()
         // setup the workflow inputs
-        collectInputs(context, args)
+        collectInputs(binding, args)
         // invoke the workflow execution
         final closure = body.closure
-        closure.delegate = context
+        closure.delegate = binding
         closure.setResolveStrategy(Closure.DELEGATE_FIRST)
         final result = closure.call()
         // collect the workflow outputs
