@@ -6,13 +6,15 @@ import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
+import groovy.util.logging.Slf4j
 import nextflow.exception.DuplicateScriptDefinitionException
+import nextflow.extension.OperatorEx
 
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-
+@Slf4j
 @CompileStatic
 class ScriptMeta {
 
@@ -47,7 +49,7 @@ class ScriptMeta {
     ScriptMeta(BaseScript script) {
         this.clazz = script.class
         for( def entry : definedFunctions0(script) ) {
-            definitions.put(entry.name, entry)
+            addDefinition(entry)
         }
     }
 
@@ -83,13 +85,16 @@ class ScriptMeta {
     }
 
     ScriptMeta addDefinition(InvokableDef invokable) {
+        final name = invokable.name
+        if( !module && name in OperatorEx.OPERATOR_NAMES )
+            log.warn "${invokable.type.capitalize()} with name '$name' overrides a built-in operator with the same name"
         definitions.put(invokable.name, invokable)
         return this
     }
 
     ScriptMeta addDefinition(InvokableDef... invokable) {
-        for( def item : invokable ) {
-            definitions.put(item.name, item)
+        for( def entry : invokable ) {
+            addDefinition(entry)
         }
         return this
     }

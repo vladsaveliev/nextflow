@@ -18,7 +18,6 @@ package nextflow.ast
 
 import groovy.transform.CompileStatic
 import groovy.util.logging.Slf4j
-import nextflow.extension.OperatorEx
 import nextflow.script.BaseScript
 import nextflow.script.IncludeDef
 import nextflow.script.TaskBody
@@ -84,15 +83,12 @@ class NextflowDSLImpl implements ASTTransformation {
         for( def method : BaseScript.getMethods() ) {
             RESERVED_NAMES.add(method.name)
         }
-        // add the built-in operator as reserved names
-        RESERVED_NAMES.addAll( OperatorEx.OPERATOR_NAMES )
+
     }
 
     @Override
     void visit(ASTNode[] astNodes, SourceUnit unit) {
-
         createVisitor(unit).visitClass((ClassNode)astNodes[1])
-
     }
 
     /*
