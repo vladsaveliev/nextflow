@@ -23,6 +23,7 @@ import java.util.zip.GZIPInputStream
 import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
@@ -312,7 +313,7 @@ abstract class AbstractSplitter<T> implements SplitterStrategy {
         [
                 each: Closure,
                 by: Integer,
-                into: [ Collection, DataflowQueue ],
+                into: [Collection, DataflowQueue, DataflowBroadcast],
                 autoClose: Boolean,
                 limit: Integer,
                 elem: Integer,

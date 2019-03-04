@@ -56,6 +56,7 @@ import nextflow.exception.ProcessUnrecoverableException
 import nextflow.exception.ShowOnlyExceptionMessage
 import nextflow.executor.CachedTaskHandler
 import nextflow.executor.Executor
+import nextflow.executor.StoredTaskHandler
 import nextflow.extension.DataflowHelper
 import nextflow.file.FileHelper
 import nextflow.file.FileHolder
@@ -751,10 +752,10 @@ class TaskProcessor {
             // -- check if all output resources are available
             collectOutputs(task)
             log.info "[skipping] Stored process > ${task.name}"
-
             // set the exit code in to the task object
             task.exitStatus = exit
             task.cached = true
+            session.notifyTaskCached(new StoredTaskHandler(task))
 
             // -- now bind the results
             finalizeTask0(task)
@@ -796,10 +797,6 @@ class TaskProcessor {
                 return false
             }
         }
-
-        /*
-         * load the task record in the cache DB
-         */
 
         /*
          * verify cached context map

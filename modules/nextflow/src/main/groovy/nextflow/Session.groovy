@@ -1004,15 +1004,18 @@ class Session implements ISession {
         }
     }
 
-
     void notifyTaskCached( TaskHandler handler ) {
-        // -- save a record in the cache index
-        cache.cacheTaskAsync(handler)
+        final trace = handler.getTraceRecord()
+        // save a record in the cache index only the when the trace record is available
+        // otherwise it means that the event is trigger by a `stored dir` driven task
+        if( trace ) {
+            cache.cacheTaskAsync(handler)
+        }
 
         for( int i=0; i<observers.size(); i++ ) {
             final observer = observers.get(i)
             try {
-                observer.onProcessCached(handler, handler.getTraceRecord())
+                observer.onProcessCached(handler, trace)
             }
             catch( Exception e ) {
                 log.error(e.getMessage(), e)

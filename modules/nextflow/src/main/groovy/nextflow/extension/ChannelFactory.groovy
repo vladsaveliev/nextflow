@@ -36,7 +36,7 @@ class ChannelFactory {
         throw new IllegalArgumentException("Illegal channel source type: ${channel?.getClass()?.getName()}")
     }
 
-    private DataflowReadChannel getRead1(DataflowQueue queue) {
+    synchronized private DataflowReadChannel getRead1(DataflowQueue queue) {
         if( !NextflowMeta.is_DSL_2() )
             return queue
 
@@ -54,7 +54,7 @@ class ChannelFactory {
         channel.createReadChannel()
     }
 
-    boolean isBridge(DataflowQueue queue) {
+    synchronized boolean isBridge(DataflowQueue queue) {
         bridges.get(queue) != null
     }
 
