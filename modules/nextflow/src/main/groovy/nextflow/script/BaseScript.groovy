@@ -16,14 +16,11 @@
 
 package nextflow.script
 
-import groovy.transform.CompileStatic
+
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.NextflowMeta
 import nextflow.Session
-import nextflow.exception.IllegalInvocationException
-import nextflow.extension.OpCall
-import nextflow.extension.OperatorEx
 import nextflow.processor.TaskProcessor
 /**
  * Any user defined script will extends this class, it provides the base execution context
@@ -31,7 +28,7 @@ import nextflow.processor.TaskProcessor
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
-abstract class BaseScript extends Script implements InvocationScope {
+abstract class BaseScript extends Script implements ExecutionContext {
 
     private static Object[] EMPTY_ARGS = [] as Object[]
 
@@ -83,6 +80,7 @@ abstract class BaseScript extends Script implements InvocationScope {
     }
 
     private void setup() {
+        binding.owner = this
         session = binding.getSession()
         processFactory = session.newProcessFactory(this)
 
@@ -98,8 +96,8 @@ abstract class BaseScript extends Script implements InvocationScope {
 
     protected process( String name, Closure body ) {
         if( NextflowMeta.is_DSL_2() ) {
-            def proc = processFactory.defineProcess(name, body)
-            meta.addDefinition(proc)
+            def process = new ProcessDef(this,body,name)
+            meta.addDefinition(process)
         }
         else {
             // legacy process definition an execution
@@ -117,16 +115,16 @@ abstract class BaseScript extends Script implements InvocationScope {
             return
         }
 
-        def workflow = new WorkflowDef(body)
+        def workflow = new WorkflowDef(this, body)
         meta.addDefinition(workflow)
-        return workflow.invoke(EMPTY_ARGS, binding)
+        return workflow.invoke_a(EMPTY_ARGS)
     }
 
     protected workflow(TaskBody body, String name, List<String> declaredInputs) {
         if(!NextflowMeta.is_DSL_2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to allow the definition of workflow components")
 
-        meta.addDefinition(new WorkflowDef(body,name,declaredInputs))
+        meta.addDefinition(new WorkflowDef(this,body,name,declaredInputs))
     }
 
     protected IncludeDef include( IncludeDef include ) {
@@ -134,62 +132,27 @@ abstract class BaseScript extends Script implements InvocationScope {
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to import module files")
 
         include
-                .setSession(session)
-                .setBinding(binding)
-                .setOwnerScript(meta.getScriptPath())
+            .setSession(session)
+            .setBinding(binding)
+            .setOwnerScript(meta.getScriptPath())
     }
 
     @Override
-    Object getProperty(String name) {
-        try {
-            super.getProperty(name)
-        }
-        catch( MissingPropertyException e ) {
-            def invokable = meta.getInvokable(name)
-            if( invokable )
-                return invokable
-
-            // check it's an operator name
-            if( OperatorEx.OPERATOR_NAMES.contains(name) )
-                return OpCall.create(name)
-
-            throw e
-        }
-    }
-
-    private void checkScope(InvokableDef invokable) {
-        if( invokable instanceof ComponentDef && ScriptMeta.current().isModule() ) {
-            throw new IllegalInvocationException(invokable)
-        }
-    }
-
-    @Override
-    @CompileStatic
     Object invokeMethod(String name, Object args) {
-        if(!NextflowMeta.is_DSL_2())
-            throw new MissingMethodException(name,this.getClass())
-
-        final invokable = meta.getInvokable(name)
-        if( invokable ) {
-            checkScope(invokable)
-            return invokable.invoke(args, ExecutionScope.context())
-        }
-
-        // check it's an operator name
-        if( OperatorEx.OPERATOR_NAMES.contains(name) )
-            return OpCall.create(name, args)
-
-        throw new MissingMethodException(name,this.getClass())
+        if(NextflowMeta.is_DSL_2())
+            binding.invokeMethod(name, args)
+        else
+            super.invokeMethod(name, args)
     }
 
     Object run() {
         setup()
-        ExecutionScope.push(this)
+        ExecutionStack.push(this)
         try {
             runScript()
         }
         finally {
-            ExecutionScope.pop()
+            ExecutionStack.pop()
         }
     }
 

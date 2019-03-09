@@ -8,7 +8,6 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import nextflow.Session
 import nextflow.exception.ProcessException
-import nextflow.file.FileHelper
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -17,19 +16,29 @@ import nextflow.file.FileHelper
 @EqualsAndHashCode
 class IncludeDef {
 
-    final String path
-    final String namespace
-    final Map params = new LinkedHashMap(10)
+    @PackageScope path
+    @PackageScope String alias
+    @PackageScope String name
+    @PackageScope Map params = new LinkedHashMap(10)
     private Session session
     private Path ownerScript
     private Binding binding
 
-    IncludeDef( String module, String ns=null ) {
+    IncludeDef( String module ) {
         this.path = module
-        this.namespace = ns
+    }
+
+    IncludeDef(TokenVar name, String alias=null ) {
+        this.name = name.name
+        this.alias = alias
     }
 
     protected IncludeDef() {}
+
+    IncludeDef from(Object path) {
+        this.path = path
+        return this
+    }
 
     IncludeDef params(Map args) {
         this.params.putAll(args)
@@ -52,18 +61,15 @@ class IncludeDef {
     }
 
     void load() {
+        if( !path )
+            throw new IllegalArgumentException("Missing module path attribute")
+
         // -- resolve the concrete against the current script
         final moduleFile = realModulePath(path)
-        // -- determine the inclusion namespace
-        String namespace = namespace ?: FileHelper.getIdentifier(moduleFile)
         // -- load the module
-        def script = loadModule0(moduleFile, params, session)
+        def moduleScript = loadModule0(moduleFile, params, session)
         // -- add it to the inclusions
-        ScriptMeta.current().addModule(namespace, script)
-        // -- add it to binding to allow access it
-        if( namespace != ScriptMeta.ROOT_NAMESPACE ) {
-            binding.getVariables().put(namespace, script)
-        }
+        ScriptMeta.current().addModule(moduleScript, name, alias)
     }
 
 

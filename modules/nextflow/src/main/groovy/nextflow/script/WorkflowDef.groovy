@@ -12,7 +12,7 @@ import nextflow.extension.ChannelFactory
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Cloneable {
+class WorkflowDef extends BindableDef implements ChainableDef, ExecutionContext {
 
     private String name
 
@@ -22,14 +22,17 @@ class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Clonea
 
     private Set<String> variableNames
 
+    private BaseScript owner
+
     // -- following attributes are mutable and instance dependant
     // -- therefore should not be cloned
 
-    private Binding binding
-
     private output
 
-    WorkflowDef(TaskBody body, String name=null, List<String> inputs = Collections.emptyList() ) {
+    private WorkflowBinding binding
+
+    WorkflowDef(BaseScript owner, TaskBody body, String name=null, List<String> inputs = Collections.emptyList() ) {
+        this.owner = owner
         this.body = body
         this.name = name
         this.declaredInputs = inputs
@@ -37,14 +40,24 @@ class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Clonea
     }
 
     WorkflowDef clone() {
-        def copy = (WorkflowDef)super.clone()
+        final copy = (WorkflowDef)super.clone()
         copy.@body = body.clone()
         return copy
     }
 
+    WorkflowDef withName(String name) {
+        def result = clone()
+        result.@name = name
+        return result
+    }
+
+    BaseScript getOwner() { owner }
+
     String getName() { name }
 
-    def getOutput() { output }
+    WorkflowBinding getBinding() { binding }
+
+    Object getOutput() { output }
 
     @PackageScope TaskBody getBody() { body }
 
@@ -53,8 +66,6 @@ class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Clonea
     @PackageScope String getSource() { body.source }
 
     @PackageScope List<String> getDeclaredVariables() { new ArrayList<String>(variableNames) }
-
-    Binding getBinding() { binding }
 
     String getType() { 'workflow' }
 
@@ -121,63 +132,28 @@ class WorkflowDef implements InvokableDef, ComponentDef, InvocationScope, Clonea
             result.bind(x)
             return result
         }
-        else {
-            def result = new DataflowQueue()
-            if( x != null ) {
-                result.bind(x)
-                result.bind(Channel.STOP)
-            }
-            return result
+
+        final result = new DataflowQueue()
+        if( x != null ) {
+            result.bind(x)
+            result.bind(Channel.STOP)
         }
+        return result
     }
 
-    Object invoke(Object[] args, Binding scope) {
-        // use this instance an workflow template, therefore clone it
-        final workflow = this.clone()
-        // workflow execution
-        ExecutionScope.push(workflow)
+    
+    Object run(Object[] args) {
+        binding = new WorkflowBinding(owner)
+        ExecutionStack.push(this)
         try {
-            final result = workflow.run0(args)
-            // register this workflow invocation in the current scope
-            // so that it can be accessed in the outer execution scope
-            if( name )
-                scope.setProperty(name, workflow)
-            return result
+            run0(args)
         }
         finally {
-            ExecutionScope.pop()
-        }
-
-    }
-
-    private ComponentDef getProcessOrWorkflowOrFail(String name) {
-        final meta = ScriptMeta.current()
-        if( !meta )
-            return null
-        def result = meta.getInvokable(name)
-        if( result instanceof ComponentDef )
-            return result
-        throw new MissingPropertyException("Not such property: $name in workflow execution context")
-    }
-
-    private Binding createBinding() {
-        new Binding() {
-            @Override
-            Object getProperty(String propertyName) {
-                try {
-                    return super.getProperty(propertyName)
-                }
-                catch (MissingPropertyException e) {
-                    return getProcessOrWorkflowOrFail(propertyName)
-                }
-            }
+            ExecutionStack.pop()
         }
     }
 
-    protected Object run0(Object[] args) {
-        // setup the execution context
-        binding = createBinding()
-        // setup the workflow inputs
+    private Object run0(Object[] args) {
         collectInputs(binding, args)
         // invoke the workflow execution
         final closure = body.closure

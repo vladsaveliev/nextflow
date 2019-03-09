@@ -5,7 +5,6 @@ import spock.lang.Timeout
 
 import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowQueue
-import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowVariable
 import nextflow.NextflowMeta
 import nextflow.ast.NextflowDSL
@@ -122,14 +121,6 @@ class WorkflowDefTest extends Specification {
         then:
         workflow.declaredInputs == ['x']
 
-        when:
-        def binding = new ScriptBinding()
-        def result = workflow.invoke('Hello', binding)
-        then:
-        result instanceof DataflowReadChannel
-        result.val == 'Hello world'
-        binding.alpha.output == result
-
     }
 
     def 'should not fail' () {
@@ -156,7 +147,7 @@ class WorkflowDefTest extends Specification {
     def 'should validate collect output'() {
 
         given:
-        def workflow = new WorkflowDef(Mock(TaskBody))
+        def workflow = new WorkflowDef(Mock(BaseScript), Mock(TaskBody))
         def result
 
         when:
@@ -216,6 +207,16 @@ class WorkflowDefTest extends Specification {
         result[0].val == 'a'
         result[1].val == 'b'
         result[2].val == 'c'
+    }
+
+    def 'should clone with a new name' () {
+        given:
+        def work = new WorkflowDef(Mock(BaseScript), Mock(TaskBody), 'woo')
+
+        when:
+        def copy = work.withName('bar')
+        then:
+        copy.getName() == 'bar'
     }
 
 }

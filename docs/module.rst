@@ -60,8 +60,8 @@ Once the `module` feature is enabled `process` components can be defined followi
 for :ref:`process-page` definition expect you will need to omit that definition of the ``from`` and ``into``
 channel declarations.
 
-Then processes can be invoked as a function passing as parameter(s) the expected
-input channel(s).
+Then processes can be invoked as a function in the ``workflow`` scope, passing as parameter the expected
+input channel.
 
 For example::
 
@@ -87,9 +87,11 @@ For example::
           """
     }
 
-    data = Channel.fromPath('/some/path/*.txt')
-    FOO()
-    BAR(data)
+    workflow {
+        data = Channel.fromPath('/some/path/*.txt')
+        FOO()
+        BAR(data)
+    }
 
 
 Process invocation
@@ -103,7 +105,9 @@ Processes having matching input-output declaration can be composed so that the o
 of the first process is passed as input to the following process. Take in consideration
 the previous process definition, it's possible to write the following::
 
-    BAR(FOO())
+    workflow {
+        BAR(FOO())
+    }
 
 Process outputs
 ---------------
@@ -111,9 +115,11 @@ Process outputs
 A process output can also be accessed using the ``output`` attribute for the respective
 process object. For example::
 
-    FOO()
-    BAR( FOO.output )
-    BAR.output.println()
+    workflow {
+        FOO()
+        BAR( FOO.output )
+        BAR.output.println()
+    }
 
 
 When a process defines two or more output channels, each of them can be accessed
@@ -179,8 +185,10 @@ For example::
 
     include 'modules/libx'
 
-    data = Channel.fromPath('/some/data/*.txt')
-    libx.MY_PIPELINE(data)
+    workflow {
+        data = Channel.fromPath('/some/data/*.txt')
+        libx.MY_PIPELINE(data)
+    }
 
 Nextflow implicitly looks for the library script ``modules/libx.nf`` resolving the path
 against the main script location.
@@ -198,8 +206,10 @@ A different namespace can be specified using the ``as`` keyword. For example::
 
     include 'modules/libx' as helpers
 
-    data = Channel.fromPath('/some/data/*.txt')
-    helpers.MY_PIPELINE(data)
+    workflow {
+        data = Channel.fromPath('/some/data/*.txt')
+        helpers.MY_PIPELINE(data)
+    }
 
 The special ``_`` namespace can be used to import library components in the script default
 namespace. For example::
@@ -209,8 +219,10 @@ namespace. For example::
 
     include 'modules/libx' as _
 
-    data = Channel.fromPath('/some/data/*.txt')
-    MY_PIPELINE(data)
+    workflow {
+        data = Channel.fromPath('/some/data/*.txt')
+        MY_PIPELINE(data)
+    }
 
 
 Library parameters
@@ -248,9 +260,11 @@ Nextflow processes and operators can be composed using the ``|`` *pipe* operator
             result = "$data mundo"
       }
 
-      data = Channel.from('Hello','world')
-
-      data | FOO
+      workflow {
+        data = Channel.from('Hello','world')
+      
+        data | FOO
+      }
 
 
 The above snippet defines a process named ``FOO`` then invoke it passing the content of the
@@ -259,19 +273,21 @@ The above snippet defines a process named ``FOO`` then invoke it passing the con
 The ``&`` *and* operator allow to feed two or more processes with the content of the same
 channel e.g.::
 
-      process FOO {
-          input: val data
-          output: val result
-          exec:
-            result = "$data mundo"
-        }
+    process FOO {
+      input: val data
+      output: val result
+      exec:
+        result = "$data mundo"
+    }
 
-        process BAR {
-            input: val data
-            output: val result
-            exec:
-              result = data.toUpperCase()
-        }
+    process BAR {
+        input: val data
+        output: val result
+        exec:
+          result = data.toUpperCase()
+    }
 
 
+    workflow {
         Channel.from('Hello') | map { it.reverse() } | (FOO & BAR)
+    }

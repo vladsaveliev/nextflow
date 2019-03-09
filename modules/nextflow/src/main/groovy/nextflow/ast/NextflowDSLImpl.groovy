@@ -55,7 +55,6 @@ import org.codehaus.groovy.ast.stmt.BlockStatement
 import org.codehaus.groovy.ast.stmt.ExpressionStatement
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
-import org.codehaus.groovy.ast.tools.GeneralUtils
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.syntax.SyntaxException
@@ -191,11 +190,23 @@ class NextflowDSLImpl implements ASTTransformation {
                 if( arg instanceof ConstantExpression ) {
                     newArgs.addExpression( newObj(IncludeDef, arg) )
                 }
-                else if( arg instanceof CastExpression && arg.getExpression() instanceof ConstantExpression) {
+                else if( arg instanceof VariableExpression ) {
+                    // the name of the component i.e. process, workflow, etc to import
+                    final component = arg.getName()
+                    // wrap the name in a `TokenVar` type
+                    final token = newObj(TokenVar, new ConstantExpression(component))
+                    // create a new `IncludeDef` object
+                    newArgs.addExpression(newObj(IncludeDef, token))
+                }
+                else if( arg instanceof CastExpression && arg.getExpression() instanceof VariableExpression) {
                     def cast = (CastExpression)arg
-                    final module = (ConstantExpression)cast.expression
-                    final ns = constX(cast.type.name)
-                    newArgs.addExpression( newObj(IncludeDef, module, ns) )
+                    // the name of the component i.e. process, workflow, etc to import
+                    final component = (cast.expression as VariableExpression).getName()
+                    // wrap the name in a `TokenVar` type
+                    final token = newObj(TokenVar, new ConstantExpression(component))
+                    // the alias to give it
+                    final alias = constX(cast.type.name)
+                    newArgs.addExpression( newObj(IncludeDef, token, alias) )
                 }
                 else {
                     syntaxError(call, "Not a valid include definition -- it must specify the module path as a string")
@@ -305,7 +316,7 @@ class NextflowDSLImpl implements ASTTransformation {
                 def expr = args.getExpression(i)
                 if( expr instanceof VariableExpression ) {
                     def varX = expr as VariableExpression
-                    result.add(GeneralUtils.constX(varX.name))
+                    result.add(constX(varX.name))
                 }
                 else {
                     throw new IllegalArgumentException("Unexpected input expression: $expr")

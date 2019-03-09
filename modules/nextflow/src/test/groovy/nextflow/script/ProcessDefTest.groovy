@@ -46,4 +46,17 @@ class ProcessDefTest extends Specification {
         true
 
     }
+
+
+    def 'should clone a process with a new name'() {
+
+        given:
+        def proc = new ProcessDef(Mock(BaseScript), 'foo', Mock(ProcessConfig), Mock(TaskBody))
+
+        when:
+        def copy = proc.withName('foo_alias')
+        then:
+        copy.getName() == 'foo_alias'
+
+    }
 }

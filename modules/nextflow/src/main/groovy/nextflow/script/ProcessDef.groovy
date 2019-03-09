@@ -17,6 +17,7 @@
 package nextflow.script
 
 import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 import nextflow.Global
 import nextflow.Session
 import nextflow.extension.ChannelFactory
@@ -24,8 +25,9 @@ import nextflow.extension.ChannelFactory
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
+@Slf4j
 @CompileStatic
-class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
+class ProcessDef extends BindableDef implements ChainableDef {
 
     private Session session = Global.session as Session
 
@@ -37,8 +39,17 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
 
     private TaskBody taskBody
 
+    private Closure rawBody
+
     private Object output
 
+    ProcessDef(BaseScript owner, Closure body, String name ) {
+        this.owner = owner
+        this.rawBody = body
+        this.name = name
+    }
+
+    @Deprecated
     ProcessDef(BaseScript owner, String name, ProcessConfig config, TaskBody body) {
         this.owner = owner
         this.name = name
@@ -46,10 +57,39 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
         this.processConfig = config
     }
 
+    protected void config() {
+        log.trace "Process config > $name"
+        
+        // the config object
+        processConfig = new ProcessConfig(owner).setProcessName(name)
+
+        // Invoke the code block which will return the script closure to the executed.
+        // As side effect will set all the property declarations in the 'taskConfig' object.
+        processConfig.throwExceptionOnMissingProperty(true)
+        final copy = (Closure)rawBody.clone()
+        copy.setResolveStrategy(Closure.DELEGATE_FIRST)
+        copy.setDelegate(processConfig)
+        taskBody = copy.call() as TaskBody
+        processConfig.throwExceptionOnMissingProperty(false)
+        if ( !taskBody )
+            throw new IllegalArgumentException("Missing script in the specified process block -- make sure it terminates with the script string to be executed")
+
+        // apply config settings to the process
+        ProcessFactory.applyConfig(name, session.config, processConfig)
+    }
+
+    @Override
     ProcessDef clone() {
         def result = (ProcessDef)super.clone()
         result.@taskBody = taskBody.clone()
         result.@processConfig = processConfig.clone()
+        return result
+    }
+
+    @Override
+    ProcessDef withName(String name) {
+        def result = clone()
+        result.@name = name
         return result
     }
 
@@ -65,19 +105,14 @@ class ProcessDef implements InvokableDef, ComponentDef, Cloneable {
 
     String getType() { 'process' }
 
-    Object invoke(Object[] args, Binding scope) {
-        // use this instance an workflow template, therefore clone it
-        def process = this.clone()
-        // invoke the process execution
-        def result = process.call0(args)
-        // register this workflow invocation in the current context
-        // so that it can be accessed in the outer execution scope
-        scope.setProperty(name, process)
-        return result
+    Object invoke_a(Object[] args) {
+        if( processConfig==null )
+            config()
+        super.invoke_a(args)
     }
 
-
-    private call0(Object[] args) {
+    @Override
+    Object run(Object[] args) {
         final params = ChannelArrayList.spread(args)
 
         // sanity check

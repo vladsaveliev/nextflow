@@ -4,8 +4,8 @@ package nextflow.script
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-interface InvocationScope {
+interface ExecutionContext {
 
-    Binding getBinding()
+    WorkflowBinding getBinding()
 
 }

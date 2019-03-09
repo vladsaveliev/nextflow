@@ -112,7 +112,7 @@ class ProcessFactory {
             throw new IllegalArgumentException("Missing script in the specified process block -- make sure it terminates with the script string to be executed")
 
         // -- apply settings from config file to process config
-        applyConfig(name, processConfig, legacySettings)
+        applyConfig(name, config, processConfig, legacySettings)
 
         // -- get the executor for the given process config
         final execObj = executorFactory.getExecutor(name, processConfig, script, session)
@@ -121,8 +121,7 @@ class ProcessFactory {
         newTaskProcessor( name, execObj, processConfig, script )
     }
 
-
-    private void applyConfig(String name, ProcessConfig processConfig, Map legacySettings=null) {
+    static void applyConfig(String name, Map config, ProcessConfig processConfig, Map legacySettings=null) {
         // -- Apply the directives defined in the config object using the`withLabel:` syntax
         final processLabels = processConfig.getLabels() ?: ['']
         for( String lbl : processLabels ) {
@@ -147,27 +146,5 @@ class ProcessFactory {
             processConfig.remove('stageInMode')
         }
     }
-
-    ProcessDef defineProcess(String name, Closure body) {
-        // the config object
-        final processConfig = new ProcessConfig(owner).setProcessName(name)
-
-        // Invoke the code block which will return the script closure to the executed.
-        // As side effect will set all the property declarations in the 'taskConfig' object.
-        processConfig.throwExceptionOnMissingProperty(true)
-        final copy = (Closure)body.clone()
-        copy.setResolveStrategy(Closure.DELEGATE_FIRST)
-        copy.setDelegate(processConfig)
-        final script = copy.call() as TaskBody
-        processConfig.throwExceptionOnMissingProperty(false)
-        if ( !script )
-            throw new IllegalArgumentException("Missing script in the specified process block -- make sure it terminates with the script string to be executed")
-
-        // apply config settings to the process
-        applyConfig(name, processConfig)
-
-        new ProcessDef(owner, name, processConfig, script)
-    }
-
 
 }

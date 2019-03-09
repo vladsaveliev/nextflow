@@ -27,9 +27,9 @@ import nextflow.Channel
 import nextflow.Global
 import nextflow.NextflowMeta
 import nextflow.dag.NodeMarker
-import nextflow.script.ComponentDef
+import nextflow.script.ChainableDef
+import nextflow.script.ExecutionStack
 import nextflow.script.ParallelDef
-import nextflow.script.ExecutionScope
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -126,18 +126,17 @@ class ChannelEx {
 
     }
 
-    static private Binding checkContext(String method, Object operand) {
+    static private void checkContext(String method, Object operand) {
         if( !NextflowMeta.is_DSL_2() )
             throw new MissingMethodException(method, operand.getClass())
 
-        def scope = ExecutionScope.context()
-        if( scope == null ) throw new IllegalArgumentException("Process invocation are only allowed within a workflow context")
-        return scope
+        if( !ExecutionStack.withinWorkflow() )
+            throw new IllegalArgumentException("Process invocation are only allowed within a workflow context")
     }
 
-    static Object or( DataflowWriteChannel left, ComponentDef right ) {
-        def context = checkContext('or', left)
-        return right.invoke(left, context)
+    static Object or(DataflowWriteChannel left, ChainableDef right ) {
+        checkContext('or', left)
+        return right.invoke_o(left)
     }
 
     static Object or( DataflowWriteChannel left, OpCall operator ) {
@@ -145,12 +144,12 @@ class ChannelEx {
         operator.setSource(left).call()
     }
 
-    static ParallelDef and(ComponentDef left, ComponentDef right) {
+    static ParallelDef and(ChainableDef left, ChainableDef right) {
         checkContext('and', left)
         return new ParallelDef().add(left).add(right)
     }
 
-    static ParallelDef and(ParallelDef left, ComponentDef right) {
+    static ParallelDef and(ParallelDef left, ChainableDef right) {
         checkContext('and', left)
         left.add(right)
     }

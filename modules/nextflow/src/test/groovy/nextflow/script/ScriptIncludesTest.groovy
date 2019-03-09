@@ -62,9 +62,9 @@ class ScriptIncludesTest extends Specification {
           return "I'm local"
         }
    
-        ret1 = module.alpha()
-        ret2 = module.bravo('Hello')
-        ret3 = module.gamma('Hola', 'mundo')
+        ret1 = alpha()
+        ret2 = bravo('Hello')
+        ret3 = gamma('Hola', 'mundo')
         ret4 = local_func()
         """
 
@@ -110,9 +110,11 @@ class ScriptIncludesTest extends Specification {
         '''
 
         SCRIPT.text = """
-        include "$MODULE" as mod1
+        include "$MODULE" 
    
-        mod1.alpha('Hello')
+        workflow {
+            alpha('Hello')
+        }
         """
 
         when:
@@ -122,7 +124,7 @@ class ScriptIncludesTest extends Specification {
 
         then:
         result.val == 'HELLO MUNDO'
-        binding.hasVariable('alpha')
+        binding.variables.alpha == null
     }
 
 
@@ -150,14 +152,16 @@ class ScriptIncludesTest extends Specification {
         '''
 
         SCRIPT.text = """
-        include "$MODULE" as mod1
+        include "$MODULE"
 
         workflow alpha(data) {
-            mod1.foo(data)
-            mod1.bar(foo.output)
+            foo(data)
+            bar(foo.output)
         }
    
-        alpha('Hello')
+        workflow {
+            alpha('Hello')
+        }
         """
 
         when:
@@ -167,7 +171,10 @@ class ScriptIncludesTest extends Specification {
 
         then:
         result.val == 'HELLO MUNDO'
-        binding.hasVariable('alpha')
+        !binding.hasVariable('alpha')
+        !binding.hasVariable('foo')
+        !binding.hasVariable('bar')
+
     }
 
     def 'should invoke an anonymous workflow' () {
@@ -194,7 +201,7 @@ class ScriptIncludesTest extends Specification {
         '''
 
         SCRIPT.text = """
-        include "$MODULE" as _
+        include "$MODULE"
    
         data = 'Hello'
         workflow {
@@ -209,6 +216,51 @@ class ScriptIncludesTest extends Specification {
 
         then:
         result.val == 'HELLO MUNDO'
+    }
+
+    def 'should gather process outputs' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+        def SCRIPT = folder.resolve('main.nf')
+
+        MODULE.text = '''
+        process foo {
+          input: val data 
+          output: val result
+          exec:
+            result = "$data mundo"
+        }     
+        
+        process bar {
+            input: val data 
+            output: val result
+            exec: 
+              result = data.toUpperCase()
+        }   
+        
+        '''
+
+        SCRIPT.text = """
+        include "$MODULE" 
+   
+        workflow {
+            data = 'Hello'
+            foo(data)
+            bar(foo.output)
+        }
+        """
+
+        when:
+        def runner = new MockScriptRunner()
+        def vars = runner.session.binding.variables
+        def result = runner.setScript(SCRIPT).execute()
+
+        then:
+        result.val == 'HELLO MUNDO'
+        !vars.containsKey('data')
+        !vars.containsKey('foo')
+        !vars.containsKey('bar')
     }
 
     def 'should define a process and invoke it' () {
@@ -227,7 +279,7 @@ class ScriptIncludesTest extends Specification {
         '''
 
         SCRIPT.text = """
-        include "$MODULE" as _
+        include "$MODULE" 
         hello_ch = Channel.from('world')
         
         workflow {
@@ -271,7 +323,7 @@ class ScriptIncludesTest extends Specification {
         workflow {
             ch1 = Channel.from('world')
             ch2 = Channel.value(['x', '/some/file'])
-            module.foo(ch1, ch2)
+            foo(ch1, ch2)
         }
         """
 
@@ -284,7 +336,6 @@ class ScriptIncludesTest extends Specification {
         result.val == 'echo sample=world pairId=x reads=/some/file'
     }
 
-    
 
     def 'should compose processes' () {
 
@@ -322,7 +373,7 @@ class ScriptIncludesTest extends Specification {
         include 'module.nf'        
 
         workflow {
-            module.bar( module.foo('Ciao') )
+            bar( foo('Ciao') )
         }
         """
         def runner = new MockScriptRunner()
@@ -338,7 +389,7 @@ class ScriptIncludesTest extends Specification {
         include 'module.nf'        
         
         workflow {
-          (ch0, ch1) = module.foo('Ciao')
+          (ch0, ch1) = foo('Ciao')
         }
         """
         runner = new MockScriptRunner()
@@ -373,7 +424,7 @@ class ScriptIncludesTest extends Specification {
         include "module.nf" params(foo:'Hello', bar: 'world')
             
         workflow { 
-            module.foo() 
+            foo() 
         }
         """
 
@@ -407,8 +458,8 @@ class ScriptIncludesTest extends Specification {
         SCRIPT.text = """  
         include 'module.nf'
 
-        def str = module.foo('dlrow')
-        return module.bar('Hello', str)
+        def str = foo('dlrow')
+        return bar('Hello', str)
         """
 
         when:
@@ -428,6 +479,7 @@ class ScriptIncludesTest extends Specification {
         MODULE.text = '''     
         params.x = 'Hello world'
         FOO = params.x   
+        
         process foo {
           output: stdout() 
           script:
@@ -437,8 +489,9 @@ class ScriptIncludesTest extends Specification {
 
         SCRIPT.text = """ 
         include 'module.nf' params(x: 'Hola mundo')
+        
         workflow {
-            return module.foo()
+            return foo()
         }    
         """
 
@@ -491,7 +544,10 @@ class ScriptIncludesTest extends Specification {
 
         SCRIPT.text = """ 
         include 'org/bio' 
-        bio.foo()
+        
+        workflow {
+            foo()
+        }
         """
 
         when:
@@ -515,8 +571,8 @@ class ScriptIncludesTest extends Specification {
         '''
 
         SCRIPT.text = """ 
-        include 'mod1' as _
-        include 'mod2' as _ 
+        include 'mod1' 
+        include 'mod2' 
         println 'x'
         """
 
@@ -525,7 +581,67 @@ class ScriptIncludesTest extends Specification {
         runner.setScript(SCRIPT).execute()
         then:
         def err = thrown(DuplicateScriptDefinitionException)
-        err.message == "Required module contains a process with name 'foo' already defined in the root namespace -- check script: $MOD2"
+        err.message == "A process with name 'foo' is already defined in the current context"
+    }
+
+    def 'should include only named component' () {
+        given:
+        def folder = Files.createTempDirectory('test')
+        def MODULE = folder.resolve('module.nf')
+
+        MODULE.text = '''
+        def alpha() {
+          return 'this is alpha result'
+        }   
+        
+        def bravo(x) { 
+          return x.reverse()
+        }
+
+        '''
+
+        when:
+        def SCRIPT = """
+        include alpha from "$MODULE"
+        alpha()
+        """
+        def runner = new MockScriptRunner()
+        def result = runner.setScript(SCRIPT).execute()
+        then:
+        result == 'this is alpha result'
+
+        when:
+        SCRIPT = """
+        include alpha as FOO from "$MODULE"
+        FOO()
+        """
+        runner = new MockScriptRunner()
+        result = runner.setScript(SCRIPT).execute()
+        then:
+        result == 'this is alpha result'
+
+
+        when:
+        SCRIPT = """
+        include alpha as FOO from "$MODULE"
+        alpha()
+        """
+        runner = new MockScriptRunner()
+        runner.setScript(SCRIPT).execute()
+        then:
+        thrown(MissingMethodException)
+
+
+        when:
+        SCRIPT = """
+        include alpha from "$MODULE"
+        bravo()
+        """
+        runner = new MockScriptRunner()
+        runner.setScript(SCRIPT).execute()
+        then:
+        thrown(MissingMethodException)
+
     }
 
 }

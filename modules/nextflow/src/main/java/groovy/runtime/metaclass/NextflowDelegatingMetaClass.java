@@ -20,8 +20,6 @@ import java.io.File;
 import java.nio.file.Path;
 
 import groovy.lang.MetaClass;
-import groovyx.gpars.dataflow.DataflowReadChannel;
-import groovyx.gpars.dataflow.DataflowWriteChannel;
 import nextflow.extension.OperatorEx;
 import nextflow.file.FileHelper;
 
@@ -61,18 +59,5 @@ public class NextflowDelegatingMetaClass extends groovy.lang.DelegatingMetaClass
 
         return delegate.invokeMethod(obj, methodName, args);
     }
-
-
-    private static boolean isInto( String name, Object source, Object[] args ) {
-        if( !"into".equals(name)) return false;
-
-        if( !(source instanceof DataflowReadChannel) ) return false;
-
-        for( int i=0; i<args.length; i++ )
-            if( !(args[i] instanceof DataflowWriteChannel )) return false;
-
-        return true;
-    }
-
 
 }

@@ -1,6 +1,6 @@
 package nextflow.exception
 
-import nextflow.script.InvokableDef
+import nextflow.script.ComponentDef
 import nextflow.script.ProcessDef
 import nextflow.script.WorkflowDef
 
@@ -10,17 +10,17 @@ import nextflow.script.WorkflowDef
  */
 class IllegalInvocationException extends ProcessException {
 
-    IllegalInvocationException(InvokableDef invokable) {
-        super(message(invokable))
+    IllegalInvocationException(ComponentDef component) {
+        super(message(component))
     }
 
-    static private String message(InvokableDef invokable) {
-        if( invokable instanceof WorkflowDef )
-            return "Workflow $invokable.name cannot be invoked from a module script"
+    static private String message(ComponentDef component) {
+        if( component instanceof WorkflowDef )
+            return "Workflow '$component.name' can only be invoked from workflow context"
 
-        if( invokable instanceof ProcessDef )
-            return "Process $invokable.name can only be invoked from a workflow context"
+        if( component instanceof ProcessDef )
+            return "Process '$component.name' can only be invoked from a workflow context"
 
-        return "Invalid invocation context: $invokable.name"
+        return "Invalid invocation context: $component.name"
     }
 }

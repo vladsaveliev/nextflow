@@ -8,8 +8,8 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import nextflow.exception.DuplicateScriptDefinitionException
+import nextflow.exception.MissingModuleComponentException
 import nextflow.extension.OperatorEx
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -17,8 +17,6 @@ import nextflow.extension.OperatorEx
 @Slf4j
 @CompileStatic
 class ScriptMeta {
-
-    static public String ROOT_NAMESPACE = '_'
 
     static private List<String> INVALID_FUNCTION_NAMES = [
             'methodMissing',
@@ -33,13 +31,22 @@ class ScriptMeta {
     }
 
     static ScriptMeta current() {
-        get(ExecutionScope.script())
+        get(ExecutionStack.script())
     }
 
+    /** the script {@link Class} object */
     private Class<? extends BaseScript> clazz
+
+    /** The location path from there the script has been loaded */
     private Path scriptPath
-    private Map<String,InvokableDef> definitions = new HashMap<>(10)
-    private Map<String,ScriptMeta> imports = new HashMap<>(10)
+
+    /** The list of function, procs and workflow defined in this script */
+    private Map<String,ComponentDef> definitions = new HashMap<>(10)
+
+    /** The module components included in the script */
+    private Map<String,ComponentDef> imports = new HashMap<>(10)
+
+    /** Whenever it's a module script or the main script */
     private boolean module
 
     Path getScriptPath() { scriptPath }
@@ -52,6 +59,9 @@ class ScriptMeta {
             addDefinition(entry)
         }
     }
+
+    /** only for testing */
+    protected ScriptMeta() {}
 
     @PackageScope
     void setScriptPath(Path path) {
@@ -84,83 +94,89 @@ class ScriptMeta {
         return result
     }
 
-    ScriptMeta addDefinition(InvokableDef invokable) {
-        final name = invokable.name
+    ScriptMeta addDefinition(ComponentDef component) {
+        final name = component.name
         if( !module && name in OperatorEx.OPERATOR_NAMES )
-            log.warn "${invokable.type.capitalize()} with name '$name' overrides a built-in operator with the same name"
-        definitions.put(invokable.name, invokable)
+            log.warn "${component.type.capitalize()} with name '$name' overrides a built-in operator with the same name"
+        definitions.put(component.name, component)
         return this
     }
 
-    ScriptMeta addDefinition(InvokableDef... invokable) {
-        for( def entry : invokable ) {
+    ScriptMeta addDefinition(ComponentDef... component) {
+        for( def entry : component ) {
             addDefinition(entry)
         }
         return this
     }
 
-    Collection<InvokableDef> getDefinitions() { definitions.values() }
+    Collection<ComponentDef> getDefinitions() {
+        return definitions.values()
+    }
 
-    InvokableDef getInvokable(String name) {
-        definitions.get(name) ?: imports.get(ROOT_NAMESPACE)?.getInvokable(name)
+    ComponentDef getComponent(String name) {
+        definitions.get(name) ?: imports.get(name)
     }
 
     WorkflowDef getWorkflow(String name) {
-        (WorkflowDef)getInvokable(name)
+        (WorkflowDef)getComponent(name)
     }
 
     ProcessDef getProcess(String name) {
-        (ProcessDef)getInvokable(name)
+        (ProcessDef)getComponent(name)
     }
 
     FunctionDef getFunction(String name) {
-        (FunctionDef)getInvokable(name)
+        (FunctionDef)getComponent(name)
     }
 
     Set<String> getProcessNames() {
-        def result = new TreeSet()
+        def result = new HashSet(definitions.size() + imports.size())
         // local definitions
-        for( def item : getDefinitions() ) {
+        for( def item : definitions.values() ) {
             if( item instanceof ProcessDef )
                 result.add(item.name)
         }
         // processes from imports
-        for( def ns: imports.keySet() ) {
-            def meta = imports.get(ns)
-            for( def item : meta.getDefinitions()) {
-                if( item instanceof ProcessDef )
-                    result.add( ns==ROOT_NAMESPACE ? item.name : "${ns}.${item.name}" )
-            }
+        for( def item: imports.values() ) {
+            if( item instanceof ProcessDef )
+                result.add(item.name)
         }
-
         return result
     }
 
-    void addModule(String namespace, BaseScript script) {
-       addModule(namespace, get(script))
+    void addModule(BaseScript script, String name, String alias) {
+       addModule(get(script), name, alias)
     }
 
-    void addModule(String namespace, ScriptMeta script) {
-        assert namespace
-        checkNamespaceCollision(namespace, script)
-        imports.put(namespace, script)
+    void addModule(ScriptMeta script, String name, String alias) {
+        assert script
+        if( name ) {
+            // include a specific
+            def item = script.getComponent(name)
+            if( !item )
+                throw new MissingModuleComponentException(script, name)
+            addModule0(item, alias)
+        }
+        else for( def item : script.getDefinitions() ) {
+            addModule0(item)
+        }
     }
 
-    protected void checkNamespaceCollision(String namespace, ScriptMeta includedScript ) {
+    protected void addModule0(ComponentDef component, String alias=null) {
+        assert component
 
-        if( namespace != ROOT_NAMESPACE ) {
-            if( imports.containsKey(namespace) ) {
-                throw new DuplicateScriptDefinitionException("A module with name '$namespace' was already imported")
-            }
-            return
+        final name = alias ?: component.name
+        final existing = getComponent(name)
+        if (existing) {
+            def msg = "A ${existing.type} with name '$name' is already defined in the current context"
+            throw new DuplicateScriptDefinitionException(msg)
         }
 
-        // check imports name in the root namespace
-        for( def item : includedScript.getDefinitions() ) {
-            if( getInvokable(item.name) ) {
-                def message = "Required module contains a ${item.type} with name '${item.name}' already defined in the root namespace -- check script: ${includedScript.scriptPath}"
-                throw new DuplicateScriptDefinitionException(message)
-            }
+        if( name != component.name ) {
+            imports.put(name, component.withName(name))
+        }
+        else {
+            imports.put(name, component)
         }
     }
 

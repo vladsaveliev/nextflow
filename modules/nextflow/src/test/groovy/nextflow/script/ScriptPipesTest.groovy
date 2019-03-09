@@ -31,7 +31,9 @@ class ScriptPipesTest extends Specification {
               result = data.toUpperCase()
         } 
 
-         Channel.from('Hello') | map { it.reverse() } | (foo & bar)
+        workflow {
+            Channel.from('Hello') | map { it.reverse() } | (foo & bar)
+        }
         '''
 
         when:

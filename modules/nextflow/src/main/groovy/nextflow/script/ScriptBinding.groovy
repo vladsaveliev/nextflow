@@ -39,7 +39,7 @@ import org.apache.commons.lang.StringUtils
  */
 @Slf4j
 @CompileStatic
-class ScriptBinding extends Binding {
+class ScriptBinding extends WorkflowBinding {
 
     private Session session
 
@@ -149,7 +149,7 @@ class ScriptBinding extends Binding {
      * @param name
      * @return
      */
-    def getVariable( String name ) {
+    Object getVariable( String name ) {
 
         if( super.hasVariable(name) )
             return super.getVariable(name)
@@ -160,7 +160,7 @@ class ScriptBinding extends Binding {
         if( sysEnv.containsKey(name) )
             return sysEnv.get(name)
 
-        throw new MissingPropertyException(name, getClass())
+        super.getVariable(name)
     }
 
     /**

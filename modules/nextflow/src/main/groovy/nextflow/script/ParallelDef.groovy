@@ -1,32 +1,40 @@
 package nextflow.script
 
+import groovy.transform.CompileStatic
+
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-class ParallelDef implements ComponentDef {
+@CompileStatic
+class ParallelDef extends ComponentDef implements ChainableDef {
 
-    private List<ComponentDef> elements = new ArrayList<>(5)
+    private List<ChainableDef> elements = new ArrayList<>(5)
 
-    ParallelDef add(ComponentDef comp) {
+    ParallelDef add(ChainableDef comp) {
         elements.add(comp)
         return this
     }
 
     String getType() { 'parallel' }
 
-    @Override
-    String getName() {
-        return "( ${elements.collect{ it.name }.join(' | ')} )"
+    ParallelDef withName(String name) {
+        throw new UnsupportedOperationException()
     }
 
     @Override
-    Object invoke(Object[] args, Binding binding) {
+    String getName() {
+        return "( ${elements.collect{ it.name }.join(' & ')} )"
+    }
+
+    @Override
+    Object invoke_a(Object[] args) {
         int i=0
-        def result = new ArrayList(args.size())
+        def result = new ArrayList(elements.size())
         for( def entry : elements )
-            result[i++] = entry.invoke(args, binding)
+            result[i++] = entry.invoke_a(args)
 
         new ChannelArrayList(ChannelArrayList.spread(result))
     }
+
 }
