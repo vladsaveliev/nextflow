@@ -1,19 +1,19 @@
-.. _modules-page:
+.. _dsl2-page:
 
-*******
-Modules
-*******
+******
+DSL 2
+******
 
-.. warning:: THIS IS AN EXPERIMENT FEATURE UNDER DEVELOPMENT. SYNTAX MAY CHANGE IN FUTURE RELEASE.
-
-
-Nextflow modules features allows the definition of process and wub-workflow components that
-can be re-used in the workflow script or across script libraries.
+Nextflow implements an experimental syntax that implements new features and enhancements that
+simplifies the implementation of data analysis applications.
 
 To enable this feature you need to defined the following directive at the beginning of
 your workflow script::
 
-    nextflow.enable.modules = true
+    nextflow.preview.dsl=2
+
+
+.. warning:: THIS IS AN EXPERIMENT FEATURE UNDER DEVELOPMENT. SYNTAX MAY CHANGE IN FUTURE RELEASE.
 
 
 Function
@@ -36,7 +36,7 @@ For example::
     }
 
 
-The above snippet defines two trivial functions, that can be invoked in the workflow script as `foo()` which
+The above snippet defines two simple functions, that can be invoked in the workflow script as `foo()` which
 returns the ``Hello world`` string and ``bar(10,20)`` which return the sum of two parameters.
 
 .. tip:: Functions implicitly return the result of the function last evaluated statement.
@@ -56,18 +56,19 @@ Process
 
 Process definition
 ------------------
-Once the `module` feature is enabled `process` components can be defined following the usual
-for :ref:`process-page` definition expect you will need to omit that definition of the ``from`` and ``into``
-channel declarations.
 
-Then processes can be invoked as a function in the ``workflow`` scope, passing as parameter the expected
-input channel.
+The new DSL separates the definition of a process by its invocation. The process definition follows the usual
+for syntax as described in the :ref:`process documentation <process-page>`. The only difference is that the
+the ``from`` and ``into`` channel declaration has to be omitted.
+
+Then processes can be invoked as a function in the ``workflow`` scope, passing the expected
+input channels as parameters.
 
 For example::
 
-    nextflow.enable.modules = true
+    nextflow.preview.dsl=2
 
-    process FOO {
+    process foo {
         output:
           file 'foo.txt'
         script:
@@ -76,7 +77,7 @@ For example::
           """
     }
 
-     process BAR {
+     process bar {
         input:
           file x
         output:
@@ -89,8 +90,8 @@ For example::
 
     workflow {
         data = Channel.fromPath('/some/path/*.txt')
-        FOO()
-        BAR(data)
+        foo()
+        bar(data)
     }
 
 
@@ -106,7 +107,7 @@ of the first process is passed as input to the following process. Take in consid
 the previous process definition, it's possible to write the following::
 
     workflow {
-        BAR(FOO())
+        foo(bar())
     }
 
 Process outputs
@@ -116,9 +117,9 @@ A process output can also be accessed using the ``output`` attribute for the res
 process object. For example::
 
     workflow {
-        FOO()
-        BAR( FOO.output )
-        BAR.output.println()
+        foo()
+        bar( foo.output )
+        bar.output.println()
     }
 
 
@@ -135,9 +136,9 @@ Workflow definition
 The ``workflow`` keyword allows the definition of sub-workflow components that enclose the
 invocation of two or more processes or operators. For example::
 
-    workflow MY_PIPELINE {
-        FOO()
-        BAR( FOO.output.collect() )
+    workflow my_pipeline {
+        foo()
+        bar( foo.output.collect() )
     }
 
 
@@ -149,9 +150,9 @@ Workflow parameters
 A workflow component can be define one or more parameter in a similar manner as for a function
 definition. For example::
 
-        workflow MY_PIPELINE( data )  {
-            FOO()
-            BAR( data.mix(FOO.output) )
+        workflow my_pipeline( data )  {
+            foo()
+            bar( data.mix( foo.output ) )
         }
 
 The result channel of the last evaluated process is implicitly returned as the workflow output.
@@ -163,74 +164,69 @@ Main workflow
 A workflow definition which does not define any name is assumed to be the main workflow and it's
 implicitly executed. Therefore it's the entry point of the workflow application. 
 
-Library
+Modules
 =======
 
-Library scripts allows the definition workflow components that
+The new DSL allows the definition module scripts that
 can be included and shared across workflow applications.
 
-A library script can contain the definition of functions, processes and workflows definition
+A module can contain the definition of function, process and workflow definitions
 as described above.
 
-Library include
+Modules include
 ---------------
 
-The library script can be imported from another Nextflow script using the ``include`` statement.
-This allows the reference of the functions, processes and workflows defined in the library from
-the importing script. 
+A module script can be included from another Nextflow script using the ``include`` keyword.
+Then it's possible to reference of components (eg. functions, processes and workflow ) defined in the module
+from the importing script.
 
 For example::
 
-    nextflow.enable.modules = true
+    nextflow.preview.dsl=2
 
     include 'modules/libx'
 
     workflow {
         data = Channel.fromPath('/some/data/*.txt')
-        libx.MY_PIPELINE(data)
+        my_pipeline(data)
     }
 
-Nextflow implicitly looks for the library script ``modules/libx.nf`` resolving the path
+Nextflow implicitly looks for the module script ``modules/libx.nf`` resolving the path
 against the main script location.
 
-Library namespace
+Selective inclusion
+-------------------
+
+The module inclusion implicitly imports all the components defined in the module script.
+It's possible to selective include only a specific component by its name using the
+inclusion extended syntax as shown below::
+
+    nextflow.preview.dsl=2
+
+    include my_pipeline from 'modules/libx'
+
+    workflow {
+        data = Channel.fromPath('/some/data/*.txt')
+        my_pipeline(data)
+    }
+
+The module component can be included using a name alias as shown below::
+
+
+    nextflow.preview.dsl=2
+
+   include my_pipeline as my_tool from 'modules/libx'
+
+    workflow {
+        data = Channel.fromPath('/some/data/*.txt')
+        my_tool(data)
+    }
+
+
+Module parameters
 -----------------
 
-The library inclusion implicitly defines a *namespace* with the name name as the library script
-e.g. ``libx`` in the previous example. Library components (i.e. functions, processes and workflows)
-can be accessed by prefixing them with the library prefix e.g. ``libx.TASK_FOO``.
-
-A different namespace can be specified using the ``as`` keyword. For example::
-
-    nextflow.enable.modules = true
-
-    include 'modules/libx' as helpers
-
-    workflow {
-        data = Channel.fromPath('/some/data/*.txt')
-        helpers.MY_PIPELINE(data)
-    }
-
-The special ``_`` namespace can be used to import library components in the script default
-namespace. For example::
-
-
-    nextflow.enable.modules = true
-
-    include 'modules/libx' as _
-
-    workflow {
-        data = Channel.fromPath('/some/data/*.txt')
-        MY_PIPELINE(data)
-    }
-
-
-Library parameters
-------------------
-
-A library script can define script parameters as any other Nextflow script.
-
-::
+A module script can define one or more parameters as any other Nextflow script.::
 
     params.foo = 'hello'
     params.bar = 'world'
@@ -240,20 +236,29 @@ A library script can define script parameters as any other Nextflow script.
     }
 
 
-Then, parameters can be specified when the library is imported with the ``include`` statement::
+Then, parameters can be specified when the module is imported with the ``include`` statement::
 
 
-    nextflow.enable.modules = true
+    nextflow.preview.dsl=2
 
     include 'modules/library.nf' params(foo: 'Hola', bar: 'mundo')
 
+
+
+Channel forking
+================
+
+Using the new DSL Nextflow channels are automatically forked when connecting two or more consumers.
+This means that, for example, a process output can be used by two or more processes without the
+need to fork them using the :ref:`operator-into` operator, making the writing of workflow script
+much fluent and readable.
 
 Pipes
 =====
 
 Nextflow processes and operators can be composed using the ``|`` *pipe* operator. For example::
 
-      process FOO {
+      process foo {
           input: val data
           output: val result
           exec:
@@ -261,26 +266,24 @@ Nextflow processes and operators can be composed using the ``|`` *pipe* operator
       }
 
       workflow {
-        data = Channel.from('Hello','world')
-      
-        data | FOO
+        Channel.from('Hello','world') | foo
       }
 
 
-The above snippet defines a process named ``FOO`` then invoke it passing the content of the
+The above snippet defines a process named ``foo`` then invoke it passing the content of the
 ``data`` channel.
 
-The ``&`` *and* operator allow to feed two or more processes with the content of the same
+The ``&`` *and* operator allow the feed of two or more processes with the content of the same
 channel e.g.::
 
-    process FOO {
+    process foo {
       input: val data
       output: val result
       exec:
         result = "$data mundo"
     }
 
-    process BAR {
+    process bar {
         input: val data
         output: val result
         exec:
@@ -289,5 +292,21 @@ channel e.g.::
 
 
     workflow {
-        Channel.from('Hello') | map { it.reverse() } | (FOO & BAR)
+        Channel.from('Hello') | map { it.reverse() } | (foo & bar)
     }
+
+
+Deprecated methods and operators
+================================
+
+The following methods are not allowed any more when using Nextflow DSL 2:
+
+* :ref:`channel-create`
+* :ref:`channel-bind1`
+* :ref:`channel-bind2`
+* :ref:`operator-close`
+* :ref:`operator-countby`
+* :ref:`operator-route`
+* :ref:`operator-separate`
+* :ref:`operator-into`
+* :ref:`operator-merge`

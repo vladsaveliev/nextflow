@@ -19,7 +19,7 @@ Contents:
    operator
    executor
    config
-   module
+   dsl2
    awscloud
    amazons3
    google

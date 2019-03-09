@@ -1673,6 +1673,7 @@ the others into ``queue2``
     queue1.subscribe { println it }
 
 
+.. _operator-separate:
 
 separate
 ------------
@@ -1762,6 +1763,8 @@ The output will look like the following fragment::
 
 See also: `into`_, `choice`_ and `map`_ operators.
 
+
+.. _operator-route:
 
 route
 -----
@@ -1856,6 +1859,8 @@ a literal value, a Java class, or a `boolean predicate` that needs to be satisfi
             .subscribe { println it }
         // -> 4
 
+
+.. _operator-countby:
 
 countBy
 ----------
