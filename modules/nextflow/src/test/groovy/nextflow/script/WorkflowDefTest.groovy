@@ -18,8 +18,8 @@ import test.MockScriptRunner
 @Timeout(5)
 class WorkflowDefTest extends Specification {
 
-    def setupSpec() { NextflowMeta.instance.enableModules() }
-    def cleanupSpec() { NextflowMeta.instance.disableModules() }
+    def setupSpec() { NextflowMeta.instance.enableDsl2() }
+    def cleanupSpec() { NextflowMeta.instance.disableDsl2() }
 
     static abstract class TestScript extends BaseScript {
 

@@ -24,7 +24,7 @@ class ChannelFactoryTest extends Specification {
 
 
         when:
-        NextflowMeta.instance.enableModules()
+        NextflowMeta.instance.enableDsl2()
         then:
         ChannelFactory.create() instanceof DataflowBroadcast
         ChannelFactory.create(false) instanceof DataflowBroadcast
@@ -34,7 +34,7 @@ class ChannelFactoryTest extends Specification {
         ChannelFactory.createBy(new DataflowQueue()) instanceof DataflowBroadcast
 
         cleanup:
-        NextflowMeta.instance.disableModules()
+        NextflowMeta.instance.disableDsl2()
 
     }
 

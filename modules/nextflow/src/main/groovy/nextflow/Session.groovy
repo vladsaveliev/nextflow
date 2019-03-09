@@ -516,7 +516,7 @@ class Session implements ISession {
     }
 
     void fireDataflowNetwork() {
-        if( !NextflowMeta.instance.isModuleEnabled() )
+        if( !NextflowMeta.instance.isDsl2() )
             return
 
         // bridge any dataflow queue into a broadcast channel

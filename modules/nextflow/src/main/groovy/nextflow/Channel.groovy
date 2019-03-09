@@ -66,7 +66,7 @@ class Channel  {
     static private Session getSession() { Global.session as Session }
     
     static boolean isDsl2() {
-        NextflowMeta.instance.isModuleEnabled()
+        NextflowMeta.instance.isDsl2()
     }
 
     /**

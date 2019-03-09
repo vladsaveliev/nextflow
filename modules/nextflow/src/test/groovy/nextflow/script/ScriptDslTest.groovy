@@ -11,8 +11,8 @@ import test.MockScriptRunner
  */
 class ScriptDslTest extends Specification {
 
-    def setupSpec() { NextflowMeta.instance.enableModules() }
-    def cleanupSpec() { NextflowMeta.instance.disableModules() }
+    def setupSpec() { NextflowMeta.instance.enableDsl2() }
+    def cleanupSpec() { NextflowMeta.instance.disableDsl2() }
 
     def 'should define processes and workflow' () {
         given:
@@ -54,12 +54,12 @@ class ScriptDslTest extends Specification {
     def 'should access nextflow enabling property' () {
         given:
         def SCRIPT = '''
-        return nextflow.enable.modules 
+        return nextflow.preview.dsl 
         '''
         when:
         def result = new MockScriptRunner().setScript(SCRIPT).execute()
         then:
-        result == true
+        result == 2
     }
 
 

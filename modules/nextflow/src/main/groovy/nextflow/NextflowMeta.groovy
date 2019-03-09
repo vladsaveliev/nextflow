@@ -2,6 +2,7 @@ package nextflow
 
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
+import groovy.util.logging.Slf4j
 import nextflow.util.VersionNumber
 
 /**
@@ -13,36 +14,47 @@ import nextflow.util.VersionNumber
 @EqualsAndHashCode
 class NextflowMeta {
 
-    static boolean is_DSL_2() { NextflowMeta.instance.isModuleEnabled() }
+    @Slf4j
+    static class Preview {
+        float dsl
+
+        void setDsl( float num ) {
+            if( num != 2 && num != 1 )
+                throw new IllegalArgumentException("Not a valid DSL version number: $num")
+            if( num == 2 )
+                log.warn "DSL 2 IS AN EXPERIMENTAL FEATURE UNDER DEVELOPMENT -- SYNTAX MAY CHANGE IN FUTURE RELEASE"
+            dsl = num
+        }
+    }
+
+    static boolean is_DSL_2() { NextflowMeta.instance.isDsl2() }
 
     final VersionNumber version
     final int build
     final String timestamp
-    final Map enable
+    final Preview preview = new Preview()
 
     private NextflowMeta() {
         version = new VersionNumber(Const.APP_VER)
         build = Const.APP_BUILDNUM
         timestamp = Const.APP_TIMESTAMP_UTC
-        enable = new HashMap(10)
     }
 
-    protected NextflowMeta(String ver, int build, String timestamp, Map enable = null ) {
+    protected NextflowMeta(String ver, int build, String timestamp ) {
         this.version = new VersionNumber(ver)
         this.build = build
         this.timestamp = timestamp
-        this.enable = enable != null ? enable : new HashMap(10)
     }
 
-    boolean isModuleEnabled() {
-        enable.modules == true
+    boolean isDsl2() {
+        preview.dsl == 2
     }
 
-    void enableModules() {
-        enable.modules=true
+    void enableDsl2() {
+        preview.dsl = 2
     }
 
-    void disableModules() {
-        enable.modules=false
+    void disableDsl2() {
+        preview.dsl = 1
     }
 }

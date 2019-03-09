@@ -21,6 +21,7 @@ import java.nio.file.Path
 
 import groovy.transform.CompileStatic
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import nextflow.Session
 import nextflow.exception.ProcessException
@@ -84,7 +85,8 @@ class IncludeDef {
     Path getOwnerPath() { getMeta().getScriptPath() }
 
     @PackageScope
-    BaseScript loadModule0(Path path, Map params, Session session) {
+    @Memoized
+    static BaseScript loadModule0(Path path, Map params, Session session) {
         try {
             final binding = new ScriptBinding() .setParams(params)
 

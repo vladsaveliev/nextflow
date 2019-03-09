@@ -32,8 +32,8 @@ import test.TestHelper
  */
 class ScriptIncludesTest extends Specification {
 
-    def setupSpec() { NextflowMeta.instance.enableModules() }
-    def cleanupSpec() { NextflowMeta.instance.disableModules() }
+    def setupSpec() { NextflowMeta.instance.enableDsl2() }
+    def cleanupSpec() { NextflowMeta.instance.disableDsl2() }
 
     def 'should invoke foreign functions' () {
         given:
