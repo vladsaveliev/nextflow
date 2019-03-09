@@ -29,7 +29,7 @@ import nextflow.NextflowMeta
 import nextflow.dag.NodeMarker
 import nextflow.script.ChainableDef
 import nextflow.script.ExecutionStack
-import nextflow.script.ParallelDef
+import nextflow.script.CompositeDef
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -144,12 +144,12 @@ class ChannelEx {
         operator.setSource(left).call()
     }
 
-    static ParallelDef and(ChainableDef left, ChainableDef right) {
+    static CompositeDef and(ChainableDef left, ChainableDef right) {
         checkContext('and', left)
-        return new ParallelDef().add(left).add(right)
+        return new CompositeDef().add(left).add(right)
     }
 
-    static ParallelDef and(ParallelDef left, ChainableDef right) {
+    static CompositeDef and(CompositeDef left, ChainableDef right) {
         checkContext('and', left)
         left.add(right)
     }

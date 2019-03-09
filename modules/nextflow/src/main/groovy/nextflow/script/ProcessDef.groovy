@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2018, Centre for Genomic Regulation (CRG)
+ * Copyright 2013-2019, Centre for Genomic Regulation (CRG)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import nextflow.Global
 import nextflow.Session
 import nextflow.extension.ChannelFactory
 /**
+ * Models a nextflow process definition
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */

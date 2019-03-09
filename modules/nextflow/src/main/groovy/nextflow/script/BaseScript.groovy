@@ -131,10 +131,8 @@ abstract class BaseScript extends Script implements ExecutionContext {
         if(!NextflowMeta.is_DSL_2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to import module files")
 
-        include
-            .setSession(session)
-            .setBinding(binding)
-            .setOwnerScript(meta.getScriptPath())
+        include .setSession(session)
+
     }
 
     @Override
@@ -157,6 +155,5 @@ abstract class BaseScript extends Script implements ExecutionContext {
     }
 
     protected abstract Object runScript()
-
 
 }

@@ -21,7 +21,8 @@ class IncludeDefTest extends Specification {
 
         given:
         def script = '/some/path/main.nf' as Path
-        def include = new IncludeDef(ownerScript: script)
+        def include = Spy(IncludeDef)
+        include.getOwnerPath() >> script
 
         expect:
         include.resolveModulePath('/abs/foo.nf') == '/abs/foo.nf' as Path
@@ -42,10 +43,11 @@ class IncludeDefTest extends Specification {
         def script = folder.resolve('main.nf'); script.text = 'echo ciao'
         def module = folder.resolve('mod-x.nf'); module.text = 'blah blah'
 
-        def include = new IncludeDef(ownerScript: script)
-
+        def include = Spy(IncludeDef)
+        include.getOwnerPath() >> script
+        
         when:
-        def result = include.realModulePath('mod-x.nf')
+        def result = include.realModulePath( 'mod-x.nf')
         then:
         result == module
 

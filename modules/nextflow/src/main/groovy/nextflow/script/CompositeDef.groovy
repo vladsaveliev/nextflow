@@ -19,28 +19,40 @@ package nextflow.script
 import groovy.transform.CompileStatic
 
 /**
- *  Abstract module component which bind itself in the
- *  current execution context once executed
+ * Models a composition of process and workflow components
+ * in a pipe operation expression
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @CompileStatic
-abstract class BindableDef extends ComponentDef {
+class CompositeDef extends ComponentDef implements ChainableDef {
 
-    abstract Object run(Object[] args)
+    private List<ChainableDef> elements = new ArrayList<>(5)
 
+    CompositeDef add(ChainableDef comp) {
+        elements.add(comp)
+        return this
+    }
+
+    String getType() { 'composite' }
+
+    CompositeDef withName(String name) {
+        throw new UnsupportedOperationException()
+    }
+
+    @Override
+    String getName() {
+        return "( ${elements.collect{ it.name }.join(' & ')} )"
+    }
+
+    @Override
     Object invoke_a(Object[] args) {
-        // use this instance an workflow template, therefore clone it
-        final comp = (BindableDef)this.clone()
-        // invoke the process execution
-        final result = comp.run(args)
-        // register this component invocation in the current context
-        // so that it can be accessed in the outer execution scope
-        if( name ) {
-            final scope = ExecutionStack.context()
-            scope.setVariable(name, comp)
-        }
-        return result
+        int i=0
+        def result = new ArrayList(elements.size())
+        for( def entry : elements )
+            result[i++] = entry.invoke_a(args)
+
+        new ChannelArrayList(ChannelArrayList.spread(result))
     }
 
 }

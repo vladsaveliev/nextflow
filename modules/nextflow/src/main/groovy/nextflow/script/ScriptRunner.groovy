@@ -32,7 +32,7 @@ import nextflow.util.HistoryFile
 import nextflow.util.VersionNumber
 import static nextflow.util.ConfigHelper.parseValue
 /**
- * Application main class
+ * Run a nextflow script file
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
