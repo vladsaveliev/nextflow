@@ -262,7 +262,7 @@ class AnsiLogObserver implements TraceObserver {
         final hh = (stats.hash && tot>0 ? stats.hash : '-').padRight(9)
 
         if( tot == 0  )
-            return "[$hh] process > $label"
+            return "[$hh] process > $label -"
 
         final x = tot ? Math.round(com / tot * 100f) : 0
         final pct = "[${String.valueOf(x).padLeft(3)}%]".toString()
