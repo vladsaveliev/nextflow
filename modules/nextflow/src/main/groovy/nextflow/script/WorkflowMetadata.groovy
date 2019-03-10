@@ -23,6 +23,7 @@ import groovy.transform.CompileStatic
 import groovy.transform.PackageScope
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
+import nextflow.NF
 import nextflow.NextflowMeta
 import nextflow.Session
 import nextflow.config.ConfigBuilder
@@ -252,7 +253,7 @@ class WorkflowMetadata {
     void onComplete( Closure action ) {
 
         final clone = (Closure)action.clone()
-        clone.delegate = session.binding.variables
+        clone.delegate = NF.binding.variables
         clone.resolveStrategy = Closure.DELEGATE_FIRST
 
         onCompleteActions.add(clone)
@@ -284,7 +285,7 @@ class WorkflowMetadata {
     void onError( Closure action ) {
 
         final clone = (Closure)action.clone()
-        clone.delegate = session.binding.variables
+        clone.delegate = NF.binding.variables
         clone.resolveStrategy = Closure.DELEGATE_FIRST
 
         onErrorActions.add(clone)
@@ -419,7 +420,7 @@ class WorkflowMetadata {
             def notifier = new WorkflowNotifier()
             notifier.workflow = this
             notifier.config = session.config
-            notifier.variables = session.binding.variables
+            notifier.variables = NF.binding.variables
             notifier.sendNotification()
         }
         catch (Exception e) {

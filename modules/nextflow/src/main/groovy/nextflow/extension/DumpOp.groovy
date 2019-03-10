@@ -56,7 +56,7 @@ class DumpOp {
     }
 
     DumpOp setSource( DataflowWriteChannel source ) {
-        this.source = session.getReadChannel(source)
+        this.source = ChannelFactory.getReadChannel(source)
         return this
     }
 

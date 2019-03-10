@@ -36,6 +36,7 @@ import groovyx.gpars.dataflow.operator.DataflowProcessor
 import groovyx.gpars.dataflow.operator.PoisonPill
 import nextflow.Channel
 import nextflow.Global
+import nextflow.NF
 import nextflow.Session
 import nextflow.splitter.FastaSplitter
 import nextflow.splitter.FastqSplitter
@@ -466,7 +467,7 @@ class OperatorEx {
     DataflowWriteChannel first( DataflowReadChannel source ) {
         if( source instanceof DataflowExpression ) {
             def msg = "The operator `first` is useless when applied to a value channel which returns a single value by definition"
-            def name = session?.binding?.getVariableName(source)
+            def name = NF.lookupVariable(source)
             if( name )
                 msg += " -- check channel `$name`"
             log.warn msg

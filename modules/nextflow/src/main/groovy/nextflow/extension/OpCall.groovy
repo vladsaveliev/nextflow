@@ -10,11 +10,8 @@ import groovyx.gpars.dataflow.DataflowBroadcast
 import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
-import nextflow.Global
-import nextflow.Session
 import nextflow.dag.NodeMarker
 import org.codehaus.groovy.runtime.InvokerHelper
-
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -27,7 +24,6 @@ class OpCall implements Callable {
 
     static ThreadLocal<OpCall> current = new ThreadLocal<>()
 
-    private Session session = Global.session as Session
     private OperatorEx owner
     private String methodName
     private Method method
@@ -36,8 +32,8 @@ class OpCall implements Callable {
     private Set inputs = new HashSet(5)
     private Set outputs = new HashSet<>(5)
 
-    static OpCall create(String method, Object args) {
-        new OpCall(method, InvokerHelper.asArray(args))
+    static OpCall create(String methodName, Object args) {
+        new OpCall(methodName, InvokerHelper.asArray(args))
     }
 
     static OpCall create(String method) {
@@ -82,12 +78,16 @@ class OpCall implements Callable {
 
     Set getOutputs() { outputs }
 
+    String getMethodName() { methodName }
+
+    Object[] getArgs() { args }
+
     private <T> T read0(source){
         if( source instanceof DataflowBroadcast )
-            return (T)session.getReadChannel(source)
+            return (T)ChannelFactory.getReadChannel(source)
 
         if( source instanceof DataflowQueue )
-            return (T)session.getReadChannel(source)
+            return (T)ChannelFactory.getReadChannel(source)
 
         else
             return (T)source

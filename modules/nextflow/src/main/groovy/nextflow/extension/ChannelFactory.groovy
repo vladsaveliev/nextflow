@@ -12,7 +12,7 @@ import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.stream.DataflowStreamReadAdapter
 import groovyx.gpars.dataflow.stream.DataflowStreamWriteAdapter
 import nextflow.Channel
-import nextflow.NextflowMeta
+import nextflow.NF
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -21,9 +21,9 @@ import nextflow.NextflowMeta
 @CompileStatic
 class ChannelFactory {
 
-    private Map<DataflowQueue, DataflowBroadcast> bridges = new HashMap<>(10)
+    static private Map<DataflowQueue, DataflowBroadcast> bridges = new HashMap<>(10)
 
-    DataflowReadChannel getReadChannel(channel) {
+    static DataflowReadChannel getReadChannel(channel) {
         if (channel instanceof DataflowQueue)
             return getRead1(channel)
 
@@ -36,8 +36,8 @@ class ChannelFactory {
         throw new IllegalArgumentException("Illegal channel source type: ${channel?.getClass()?.getName()}")
     }
 
-    synchronized private DataflowReadChannel getRead1(DataflowQueue queue) {
-        if( !NextflowMeta.is_DSL_2() )
+    static synchronized private DataflowReadChannel getRead1(DataflowQueue queue) {
+        if( !NF.isDsl2() )
             return queue
 
         def broadcast = bridges.get(queue)
@@ -48,17 +48,17 @@ class ChannelFactory {
         return broadcast.createReadChannel()
     }
 
-    private DataflowReadChannel getRead2(DataflowBroadcast channel) {
-        if( !NextflowMeta.is_DSL_2() )
+    static private DataflowReadChannel getRead2(DataflowBroadcast channel) {
+        if( !NF.isDsl2() )
             throw new IllegalStateException("Broadcast channel are only allowed in a workflow definition scope")
         channel.createReadChannel()
     }
 
-    synchronized boolean isBridge(DataflowQueue queue) {
+    static synchronized boolean isBridge(DataflowQueue queue) {
         bridges.get(queue) != null
     }
 
-    void broadcast() {
+    static void broadcast() {
         // connect all dataflow queue variables to associated broadcast channel 
         for( DataflowQueue queue : bridges.keySet() ) {
             log.debug "Bridging dataflow queue=$queue"
@@ -66,6 +66,8 @@ class ChannelFactory {
             queue.into(broadcast)
         }
     }
+
+    static void init() { bridges.clear() }
 
     @PackageScope
     static DataflowWriteChannel close0(DataflowWriteChannel source) {
@@ -87,7 +89,7 @@ class ChannelFactory {
         if( value )
             return new DataflowVariable()
 
-        if( NextflowMeta.is_DSL_2() )
+        if( NF.isDsl2() )
             return new DataflowBroadcast()
 
         return new DataflowQueue()

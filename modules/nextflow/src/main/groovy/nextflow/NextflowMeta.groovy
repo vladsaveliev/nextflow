@@ -27,8 +27,6 @@ class NextflowMeta {
         }
     }
 
-    static boolean is_DSL_2() { NextflowMeta.instance.isDsl2() }
-
     final VersionNumber version
     final int build
     final String timestamp

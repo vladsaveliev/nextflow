@@ -16,6 +16,7 @@
 
 package nextflow.dag
 
+import groovy.transform.MapConstructor
 import groovy.transform.PackageScope
 import groovy.transform.ToString
 import groovy.util.logging.Slf4j
@@ -25,8 +26,8 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import groovyx.gpars.dataflow.expression.DataflowExpression
 import groovyx.gpars.dataflow.operator.DataflowProcessor
-import nextflow.Global
-import nextflow.Session
+import nextflow.NF
+import nextflow.extension.ChannelFactory
 import nextflow.extension.DataflowHelper
 import nextflow.processor.TaskProcessor
 import nextflow.script.DefaultInParam
@@ -53,11 +54,6 @@ class DAG {
         ORIGIN,
         NODE
     }
-
-    /**
-     * The {@link nextflow.Session} to which this DAG is bound
-     */
-    private Session session = Global.session as Session
 
     /**
      * The list of edges in the graph
@@ -200,7 +196,7 @@ class DAG {
             return true
         if( obj instanceof DataflowBroadcast )
             return true
-        return obj instanceof DataflowQueue && session.channelFactory.isBridge(obj)
+        return obj instanceof DataflowQueue && ChannelFactory.isBridge(obj)
     }
 
     private void outbound( Vertex vertex, ChannelHandler leaving) {
@@ -295,13 +291,17 @@ class DAG {
     }
 
     @PackageScope
-    void resolveEdgeNames(Map map) {
-        edges.each { Edge edge ->
-            def name = resolveChannelName(map, edge.channel)
-            if( name ) edge.label = name
+    void resolveEdgeNames() {
+        for( Edge edge : edges ) {
+            final name = lookupVariable(edge.channel)
+            if( name )
+                edge.label = name
         }
     }
 
+    @PackageScope String lookupVariable(obj) {
+        NF.lookupVariable(obj)
+    }
 
     @PackageScope
     String resolveChannelName( Map map, channel ) {
@@ -312,15 +312,12 @@ class DAG {
     @PackageScope
     String getChannelName( ChannelHandler handler ) {
         def result = handler.label
-        result ?: (session ? resolveChannelName( session.getBinding().getVariables(), handler.channel ) : null )
+        result ?: NF.lookupVariable(handler.channel)
     }
 
     void normalize() {
         normalizeMissingVertices()
-        if( session )
-            resolveEdgeNames(session.getBinding().getVariables())
-        else
-            log.debug "Missing session object -- Cannot normalize edge names"
+        resolveEdgeNames()
     }
 
     /**
@@ -418,6 +415,7 @@ class DAG {
      */
     @PackageScope
     @ToString(includeNames = true, includes = 'label,from,to', includePackage=false)
+    @MapConstructor
     class Edge {
 
         /**

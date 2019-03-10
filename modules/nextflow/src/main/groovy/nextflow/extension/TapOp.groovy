@@ -22,7 +22,7 @@ import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import groovyx.gpars.dataflow.operator.ChainWithClosure
 import groovyx.gpars.dataflow.operator.CopyChannelsClosure
-import nextflow.Global
+import nextflow.NF
 import static nextflow.extension.DataflowHelper.newOperator
 /**
  * Implements the {@link OperatorEx#tap} operator
@@ -67,7 +67,7 @@ class TapOp {
         if( !names )
             throw new IllegalArgumentException("Missing target channel on `tap` operator")
 
-        final binding = Global.session.binding
+        final binding = NF.binding
         names.each { item ->
             def channel = ChannelFactory.createBy(source)
             if( binding.hasVariable(item) )

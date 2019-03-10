@@ -19,6 +19,7 @@ package nextflow.script
 
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
+import nextflow.NF
 import nextflow.NextflowMeta
 import nextflow.Session
 import nextflow.processor.TaskProcessor
@@ -95,7 +96,7 @@ abstract class BaseScript extends Script implements ExecutionContext {
     }
 
     protected process( String name, Closure body ) {
-        if( NextflowMeta.is_DSL_2() ) {
+        if( NF.isDsl2() ) {
             def process = new ProcessDef(this,body,name)
             meta.addDefinition(process)
         }
@@ -107,7 +108,7 @@ abstract class BaseScript extends Script implements ExecutionContext {
     }
 
     protected workflow(TaskBody body) {
-        if(!NextflowMeta.is_DSL_2())
+        if(!NF.isDsl2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to allow the definition of workflow components")
 
         if( meta.isModule() ) {
@@ -121,14 +122,14 @@ abstract class BaseScript extends Script implements ExecutionContext {
     }
 
     protected workflow(TaskBody body, String name, List<String> declaredInputs) {
-        if(!NextflowMeta.is_DSL_2())
+        if(!NF.isDsl2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to allow the definition of workflow components")
 
         meta.addDefinition(new WorkflowDef(this,body,name,declaredInputs))
     }
 
     protected IncludeDef include( IncludeDef include ) {
-        if(!NextflowMeta.is_DSL_2())
+        if(!NF.isDsl2())
             throw new IllegalStateException("Module feature not enabled -- User `nextflow.module = true` to import module files")
 
         include .setSession(session)
@@ -137,7 +138,7 @@ abstract class BaseScript extends Script implements ExecutionContext {
 
     @Override
     Object invokeMethod(String name, Object args) {
-        if(NextflowMeta.is_DSL_2())
+        if(NF.isDsl2())
             binding.invokeMethod(name, args)
         else
             super.invokeMethod(name, args)

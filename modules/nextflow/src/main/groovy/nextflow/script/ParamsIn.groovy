@@ -25,9 +25,7 @@ import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowVariable
 import groovyx.gpars.dataflow.expression.DataflowExpression
-import nextflow.Global
 import nextflow.Nextflow
-import nextflow.Session
 import nextflow.exception.ProcessException
 import nextflow.extension.ChannelFactory
 import nextflow.extension.ToListOp
@@ -153,8 +151,6 @@ interface InParam {
 @Slf4j
 abstract class BaseInParam extends BaseParam implements InParam {
 
-    private Session session = Global.session as Session
-
     protected fromObject
 
     protected bindObject
@@ -197,7 +193,7 @@ abstract class BaseInParam extends BaseParam implements InParam {
         }
 
         if ( value instanceof DataflowReadChannel || value instanceof DataflowBroadcast )  {
-            return session.getReadChannel(value)
+            return ChannelFactory.getReadChannel(value)
         }
 
         // wrap any collections with a DataflowQueue

@@ -28,10 +28,9 @@ import groovyx.gpars.dataflow.operator.DataflowEventAdapter
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.Channel
 import nextflow.Global
+import nextflow.NF
 import nextflow.Session
-
 import static nextflow.extension.DataflowHelper.newChannelBy
-
 /**
  * Implements the {@link OperatorEx#into} operators logic
  *
@@ -73,7 +72,6 @@ class IntoOp {
         assert holder
 
         final names = CaptureProperties.capture(holder)
-        final binding = Global.session.binding
         if( !names )
             throw new IllegalArgumentException("Missing target channel names in `into` operator")
         if( names.size() == 1 )
@@ -83,7 +81,7 @@ class IntoOp {
         names.each { identifier ->
             def channel = newChannelBy(source)
             targets.add(channel)
-            binding.setVariable(identifier, channel)
+            NF.binding.setVariable(identifier, channel)
         }
 
         this.source = source

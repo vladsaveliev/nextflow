@@ -17,6 +17,7 @@
 package nextflow.script
 
 import groovy.transform.CompileStatic
+import groovy.transform.PackageScope
 import nextflow.exception.IllegalInvocationException
 import nextflow.extension.OpCall
 import nextflow.extension.OperatorEx
@@ -28,6 +29,14 @@ import nextflow.extension.OperatorEx
  */
 @CompileStatic
 class WorkflowBinding extends Binding  {
+
+    static Map<Object,String> lookupTable = new HashMap<>()
+
+    static String lookup(Object value) {
+        return lookupTable.get(value)
+    }
+
+    static void init() { lookupTable.clear() }
 
     private BaseScript owner
 
@@ -50,7 +59,6 @@ class WorkflowBinding extends Binding  {
         return this
     }
 
-
     BaseScript getOwner() {
         return owner
     }
@@ -60,37 +68,48 @@ class WorkflowBinding extends Binding  {
         "${this.getClass().getSimpleName()}[vars=${variables}]"
     }
 
-    private void checkScope(ComponentDef component) {
+    @PackageScope void checkScope0(ComponentDef component) {
         if( component instanceof ChainableDef && !ExecutionStack.withinWorkflow() ) {
             throw new IllegalInvocationException(component)
         }
     }
 
+    @PackageScope ComponentDef getComponent0(String name) {
+        meta.getComponent(name)
+    }
+
     @Override
     Object invokeMethod(String name, Object args) {
-        final component = meta.getComponent(name)
-        if( component ) {
-            checkScope(component)
-            return component.invoke_o(args)
-        }
+        if( meta ) {
+            final component = getComponent0(name)
+            if( component ) {
+                checkScope0(component)
+                return component.invoke_o(args)
+            }
 
-        // check it's an operator name
-        if( OperatorEx.OPERATOR_NAMES.contains(name) )
-            return OpCall.create(name, args)
+            // check it's an operator name
+            if( OperatorEx.OPERATOR_NAMES.contains(name) )
+                return OpCall.create(name, args)
+        }
 
         throw new MissingMethodException(name,this.getClass())
     }
 
+    @Override
+    void setVariable(String name, Object value) {
+        lookupTable.put(value, name)
+        super.setVariable(name, value)
+    }
 
     Object getVariable(String name) {
         try {
             super.getVariable(name)
         }
         catch( MissingPropertyException e ) {
-            if( meta==null )
-                throw e
-
-            def component = meta.getComponent(name)
+            if( !meta )
+                 throw e
+            
+            def component = getComponent0(name)
             if( component )
                 return component
 

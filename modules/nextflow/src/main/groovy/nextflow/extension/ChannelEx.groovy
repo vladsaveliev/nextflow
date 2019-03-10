@@ -24,12 +24,12 @@ import groovyx.gpars.dataflow.DataflowQueue
 import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.DataflowWriteChannel
 import nextflow.Channel
-import nextflow.Global
-import nextflow.NextflowMeta
+import nextflow.NF
 import nextflow.dag.NodeMarker
 import nextflow.script.ChainableDef
-import nextflow.script.ExecutionStack
+import nextflow.script.ChannelArrayList
 import nextflow.script.CompositeDef
+import nextflow.script.ExecutionStack
 /**
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
@@ -62,8 +62,20 @@ class ChannelEx {
         if( name.size()>1 )
             throw new IllegalArgumentException("Operation `set` does not allow more than one target name")
 
-        final binding = Global.session.binding
-        binding.setVariable(name[0], source)
+        NF.binding.setVariable(name[0], source)
+    }
+
+    static void set(ChannelArrayList source, Closure holder) {
+        final names = CaptureProperties.capture(holder)
+        if( names.size() > source.size() )
+            throw new IllegalArgumentException("Operation `set` expects ${names.size()} channels but only ${source.size()} are provided")
+
+        for( int i=0; i<source.size(); i++ ) {
+            final ch = source[i]
+            final nm = names[i]
+            NF.binding.setVariable(nm, ch)
+        }
+
     }
 
     static DataflowWriteChannel dump(final DataflowWriteChannel source, Closure closure = null) {
@@ -127,7 +139,7 @@ class ChannelEx {
     }
 
     static private void checkContext(String method, Object operand) {
-        if( !NextflowMeta.is_DSL_2() )
+        if( !NF.isDsl2() )
             throw new MissingMethodException(method, operand.getClass())
 
         if( !ExecutionStack.withinWorkflow() )

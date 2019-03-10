@@ -32,7 +32,6 @@ import groovy.transform.Memoized
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
 import groovyx.gpars.GParsConfig
-import groovyx.gpars.dataflow.DataflowReadChannel
 import groovyx.gpars.dataflow.operator.DataflowProcessor
 import nextflow.config.Manifest
 import nextflow.container.ContainerConfig
@@ -94,8 +93,6 @@ class Session implements ISession {
      * Creates process executors
      */
     ExecutorFactory executorFactory
-
-    ChannelFactory channelFactory
 
     /**
      * Script binding
@@ -289,6 +286,8 @@ class Session implements ISession {
         // -- poor man session object dependency injection
         Global.setSession(this)
         Global.setConfig(config)
+        // -- init static structs
+        NF.init()
 
         // -- cacheable flag
         cacheable = config.cacheable
@@ -329,7 +328,7 @@ class Session implements ISession {
 
         // -- file porter config
         this.filePorter = new FilePorter(this)
-        this.channelFactory = new ChannelFactory()
+
     }
 
     /**
@@ -520,7 +519,7 @@ class Session implements ISession {
             return
 
         // bridge any dataflow queue into a broadcast channel
-        channelFactory.broadcast()
+        ChannelFactory.broadcast()
 
         log.debug "Ignite dataflow network (${igniters.size()})"
         for( def action : igniters ) {
@@ -549,10 +548,6 @@ class Session implements ISession {
             log.debug "Unexpected error dumping DGA status", e
             return null
         }
-    }
-
-    DataflowReadChannel getReadChannel(source) {
-        channelFactory.getReadChannel(source)
     }
 
     Session start() {
