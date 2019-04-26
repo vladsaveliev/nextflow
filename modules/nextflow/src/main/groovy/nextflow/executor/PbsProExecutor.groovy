@@ -50,25 +50,27 @@ class PbsProExecutor extends PbsExecutor {
 
         // the requested queue name
         if( task.config.queue ) {
-            result << '-q'  << (String)task.config.queue
-        }
-
-        def res = []
-        if( task.config.cpus > 1 ) {
-            res << "ncpus=${task.config.cpus}".toString()
-        }
-        if( task.config.memory ) {
-            // https://www.osc.edu/documentation/knowledge_base/out_of_memory_oom_or_excessive_memory_usage
-            res << "mem=${task.config.getMemory().getMega()}mb".toString()
-        }
-        if( res ) {
-            result << '-l' << "select=1:${res.join(':')}".toString()
+            result << '-q' << (String)task.config.queue
         }
 
         // max task duration
         if( task.config.time ) {
             final duration = task.config.getTime()
-            result << "-l" << "walltime=${duration.format('HH:mm:ss')}".toString()
+            result << "-l" << (String)"walltime=${duration.format('HH:mm:ss')}"
+        }
+
+        if( task.config.cpus > 1 ) {
+            result << '-l' << (String)"ncpus=${task.config.cpus}"
+        }
+
+        // task max memory
+        if( task.config.memory ) {
+            // https://www.osc.edu/documentation/knowledge_base/out_of_memory_oom_or_excessive_memory_usage
+            result << '-l' << (String)"mem=${task.config.getMemory().getMega()}mb"
+        }
+
+        if( task.config.penv ) {
+            result << '-P' << (String)task.config.penv
         }
 
         // -- at the end append the command script wrapped file name
