@@ -43,23 +43,23 @@ class PbsExecutor extends AbstractGridExecutor {
 
         // the requested queue name
         if( task.config.queue ) {
-            result << '-q'  << (String)task.config.queue
+            result << '-q' << (String)task.config.queue
         }
 
         if( task.config.cpus > 1 ) {
-            result << '-l' << "nodes=1:ppn=${task.config.cpus}"
+            result << '-l' << (String)"nodes=1:ppn=${task.config.cpus}"
         }
 
         // max task duration
         if( task.config.time ) {
             final duration = task.config.getTime()
-            result << "-l" << "walltime=${duration.format('HH:mm:ss')}"
+            result << '-l' << (String)"walltime=${duration.format('HH:mm:ss')}"
         }
 
         // task max memory
         if( task.config.memory ) {
             // https://www.osc.edu/documentation/knowledge_base/out_of_memory_oom_or_excessive_memory_usage
-            result << "-l" << "mem=${task.config.memory.toString().replaceAll(/[\s]/,'').toLowerCase()}"
+            result << '-l' << (String)"mem=${task.config.memory.toString().replaceAll(/[\s]/,'').toLowerCase()}"
         }
 
         // -- at the end append the command script wrapped file name
