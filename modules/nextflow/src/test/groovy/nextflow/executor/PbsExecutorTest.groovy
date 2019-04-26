@@ -58,12 +58,13 @@ class PbsExecutorTest extends Specification {
         when:
         task.config = new TaskConfig()
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
 
@@ -72,14 +73,15 @@ class PbsExecutorTest extends Specification {
         task.config.queue = 'alpha'
         task.config.time = '1m'
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
                 #PBS -q alpha
                 #PBS -l walltime=00:01:00
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
 
@@ -89,15 +91,16 @@ class PbsExecutorTest extends Specification {
         task.config.time = '1m'
         task.config.memory = '1m'
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
                 #PBS -q alpha
                 #PBS -l walltime=00:01:00
                 #PBS -l mem=1mb
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
 
@@ -109,7 +112,7 @@ class PbsExecutorTest extends Specification {
         task.config.memory = '5m'
         task.config.cpus = 2
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
@@ -117,8 +120,9 @@ class PbsExecutorTest extends Specification {
                 #PBS -l nodes=1:ppn=2
                 #PBS -l walltime=00:10:00
                 #PBS -l mem=5mb
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
         when:
@@ -128,7 +132,7 @@ class PbsExecutorTest extends Specification {
         task.config.memory = '1g'
         task.config.cpus = 8
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
@@ -136,8 +140,9 @@ class PbsExecutorTest extends Specification {
                 #PBS -l nodes=1:ppn=8
                 #PBS -l walltime=24:00:00
                 #PBS -l mem=1gb
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
         when:
@@ -146,15 +151,16 @@ class PbsExecutorTest extends Specification {
         task.config.time = '2d 6h 10m'
         task.config.memory = '2g'
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o /work/dir/.command.log
                 #PBS -j oe
                 #PBS -q delta
                 #PBS -l walltime=54:10:00
                 #PBS -l mem=2gb
+                export PATH=${System.getenv("PATH")}
                 cd /work/dir
-                '''
+                """
                 .stripIndent().leftTrim()
 
     }
@@ -176,12 +182,13 @@ class PbsExecutorTest extends Specification {
         when:
         task.config = new TaskConfig()
         then:
-        executor.getHeaders(task) == '''
+        executor.getHeaders(task) == """
                 #PBS -N nf-task_name
                 #PBS -o "/work/dir\\ 1/.command.log"
                 #PBS -j oe
+                export PATH=${System.getenv("PATH")}
                 cd "/work/dir\\ 1"
-                '''
+                """
                 .stripIndent().leftTrim()
 
     }

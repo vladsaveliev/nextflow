@@ -94,7 +94,7 @@ class PbsProExecutorTest extends Specification {
                 '-o', '/foo/bar/.command.log',
                 '-j', 'oe',
                 '-q', 'my-queue',
-                '-l', 'select=1:ncpus=4'
+                '-l', 'ncpus=4'
         ]
     }
 
@@ -118,7 +118,7 @@ class PbsProExecutorTest extends Specification {
                 '-o', '/foo/bar/.command.log',
                 '-j', 'oe',
                 '-q', 'my-queue',
-                '-l', 'select=1:mem=2048mb'
+                '-l', 'mem=2048mb'
         ]
     }
 
@@ -142,7 +142,8 @@ class PbsProExecutorTest extends Specification {
                 '-o', '/foo/bar/.command.log',
                 '-j', 'oe',
                 '-q', 'my-queue',
-                '-l', 'select=1:ncpus=8:mem=1024mb'
+                '-l', 'ncpus=8',
+                '-l', 'mem=1024mb'
         ]
     }
 

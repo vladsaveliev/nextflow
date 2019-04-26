@@ -73,6 +73,12 @@ class PbsExecutor extends AbstractGridExecutor {
     @Override
     String getHeaders( TaskRun task ) {
         String result = super.getHeaders(task)
+
+        // Exporting PATH
+        String path = System.getenv("PATH")
+        result += "export PATH=${path}\n"
+
+        // Changing to working directory
         result += "cd ${quote(task.workDir)}\n"
         return result
     }
