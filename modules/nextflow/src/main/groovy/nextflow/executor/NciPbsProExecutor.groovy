@@ -31,7 +31,7 @@ import nextflow.processor.TaskRun
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 @Slf4j
-class PbsProExecutor extends PbsExecutor {
+class NciPbsProExecutor extends PbsExecutor {
 
     /**
      * Gets the directives to submit the specified task to the cluster for execution
@@ -50,25 +50,27 @@ class PbsProExecutor extends PbsExecutor {
 
         // the requested queue name
         if( task.config.queue ) {
-            result << '-q'  << (String)task.config.queue
-        }
-
-        def res = []
-        if( task.config.cpus > 1 ) {
-            res << "ncpus=${task.config.cpus}".toString()
-        }
-        if( task.config.memory ) {
-            // https://www.osc.edu/documentation/knowledge_base/out_of_memory_oom_or_excessive_memory_usage
-            res << "mem=${task.config.getMemory().getMega()}mb".toString()
-        }
-        if( res ) {
-            result << '-l' << "select=1:${res.join(':')}".toString()
+            result << '-q' << (String)task.config.queue
         }
 
         // max task duration
         if( task.config.time ) {
             final duration = task.config.getTime()
-            result << "-l" << "walltime=${duration.format('HH:mm:ss')}".toString()
+            result << "-l" << (String)"walltime=${duration.format('HH:mm:ss')}"
+        }
+
+        if( task.config.cpus > 1 ) {
+            result << '-l' << (String)"ncpus=${task.config.cpus}"
+        }
+
+        // task max memory
+        if( task.config.memory ) {
+            // https://www.osc.edu/documentation/knowledge_base/out_of_memory_oom_or_excessive_memory_usage
+            result << '-l' << (String)"mem=${task.config.getMemory().getMega()}mb"
+        }
+
+        if( task.config.penv ) {
+            result << '-P' << (String)task.config.penv
         }
 
         // -- at the end append the command script wrapped file name
@@ -81,9 +83,28 @@ class PbsProExecutor extends PbsExecutor {
 
     @Override
     protected List<String> queueStatusCommand(Object queue) {
-        String cmd = 'qstat -f'
-        if( queue ) cmd += ' ' + queue
-        return ['bash','-c', "set -o pipefail; $cmd | { egrep '(Job Id:|job_state =)' || true; }".toString()]
+        String cmd = 'qstat -u $USER'
+        return ['bash','-c', "set -o pipefail; $cmd".toString()]
+    }
+
+    @Override
+    protected Map<String, QueueStatus> parseQueueStatus(String text) {
+
+        final result = [:]
+
+        String id = null
+        String status = null
+        text.eachLine { line ->
+            // 8414746.r-man2  vs2870   express- exp16m100   10956   1  16  100gb 24:00 R 19:50
+            def group = (line =~ /(\S+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(\S+).*/)
+            if (group.size() > 0 && group[0].size() >= 2) {
+                id = group[0][1]
+                status = group[0][2]
+            }
+            result.put( id, decode(status) ?: QueueStatus.UNKNOWN )
+        }
+
+        return result
     }
 
     // see https://www.pbsworks.com/pdfs/PBSRefGuide18.2.pdf
