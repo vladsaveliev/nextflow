@@ -267,7 +267,7 @@ abstract class AbstractGridExecutor extends Executor {
             final buf = new StringBuilder()
             final process = new ProcessBuilder(cmd).redirectErrorStream(true).start()
             final consumer = process.consumeProcessOutputStream(buf)
-            process.waitForOrKill(60_000)
+            process.waitForOrKill(240_000)
             final exit = process.exitValue(); consumer.join() // <-- make sure sync with the output consume #1045
             final result = buf.toString()
 
