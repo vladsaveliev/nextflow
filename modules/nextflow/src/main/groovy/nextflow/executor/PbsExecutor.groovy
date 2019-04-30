@@ -76,7 +76,7 @@ class PbsExecutor extends AbstractGridExecutor {
 
         // Exporting PATH
         String path = System.getenv("PATH")
-        result += "export PATH=${path}\n"
+        result += "export PATH=${path}\$PATH\n"
 
         // Changing to working directory
         result += "cd ${quote(task.workDir)}\n"
