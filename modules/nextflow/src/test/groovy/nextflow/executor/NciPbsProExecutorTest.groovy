@@ -31,7 +31,7 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives' () {
         given:
-        def executor = Spy(NciPbsProExecutorTest)
+        def executor = Spy(NciPbsProExecutor)
         def WORK_DIR = Paths.get('/here')
 
         def task = Mock(TaskRun)
@@ -53,7 +53,7 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives with queue' () {
         given:
-        def executor = Spy(NciPbsProExecutorTest)
+        def executor = Spy(NciPbsProExecutor)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -76,7 +76,7 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives with cpus' () {
         given:
-        def executor = Spy(NciPbsProExecutorTest)
+        def executor = Spy(NciPbsProExecutor)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -100,7 +100,7 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives with mem' () {
         given:
-        def executor = Spy(NciPbsProExecutorTest)
+        def executor = Spy(NciPbsProExecutor)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -124,7 +124,7 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives with cpus and mem' () {
         given:
-        def executor = Spy(NciPbsProExecutorTest)
+        def executor = Spy(NciPbsProExecutor)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -149,45 +149,38 @@ class NciPbsProExecutorTest extends Specification {
 
     def 'should return qstat command line' () {
         given:
-        def executor = [:] as NciPbsProExecutorTest
+        def executor = [:] as NciPbsProExecutor
 
         expect:
-        executor.queueStatusCommand(null) == ['bash','-c', "set -o pipefail; qstat -f | { egrep '(Job Id:|job_state =)' || true; }"]
-        executor.queueStatusCommand('xxx') == ['bash','-c', "set -o pipefail; qstat -f xxx | { egrep '(Job Id:|job_state =)' || true; }"]
+        executor.queueStatusCommand(null) == ['bash','-c', "set -o pipefail; qstat -u \$USER"]
+        executor.queueStatusCommand('xxx') == ['bash','-c', "set -o pipefail; qstat -u \$USER"]
         executor.queueStatusCommand('xxx').each { assert it instanceof String }
     }
 
     def 'should parse queue status'() {
 
         setup:
-        def executor = [:] as NciPbsProExecutorTest
+        def executor = [:] as NciPbsProExecutor
         def text =
             """
-                Job Id: 12.localhost
-                    job_state = F
-                Job Id: 13.localhost
-                    job_state = R
-                Job Id: 14.localhost
-                    job_state = Q
-                Job Id: 15.localhost
-                    job_state = S
-                Job Id: 16.localhost
-                    job_state = E
-                Job Id: 17.localhost
-                    job_state = H
 
+r-man2:
+                                                            Req'd  Req'd   Elap
+Job ID          Username Queue    Jobname    SessID NDS TSK Memory Time  S Time
+--------------- -------- -------- ---------- ------ --- --- ------ ----- - -----
+8453988.r-man2  vs2870   normalbw c14m100     14650   1  14  100gb 48:00 R 24:06
+8479227.r-man2  vs2870   normalbw nf-MapRead  48299   1  28   80gb 48:00 Q 02:27
+8479228.r-man2  vs2870   normalbw nf-MapRead  36449   1  28   80gb 48:00 H 02:27
                 """.stripIndent().trim()
 
         when:
         def result = executor.parseQueueStatus(text)
         then:
-        result.size() == 6
-        result['12.localhost'] == AbstractGridExecutor.QueueStatus.DONE
-        result['13.localhost'] == AbstractGridExecutor.QueueStatus.RUNNING
-        result['14.localhost'] == AbstractGridExecutor.QueueStatus.PENDING
-        result['15.localhost'] == AbstractGridExecutor.QueueStatus.HOLD
-        result['16.localhost'] == AbstractGridExecutor.QueueStatus.RUNNING
-        result['17.localhost'] == AbstractGridExecutor.QueueStatus.HOLD
+        println("result=${result}")
+        result.size() == 3
+        result['8453988.r-man2'] == AbstractGridExecutor.QueueStatus.RUNNING
+        result['8479227.r-man2'] == AbstractGridExecutor.QueueStatus.PENDING
+        result['8479228.r-man2'] == AbstractGridExecutor.QueueStatus.HOLD
 
     }
 

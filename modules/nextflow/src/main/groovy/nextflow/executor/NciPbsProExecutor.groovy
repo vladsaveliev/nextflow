@@ -108,13 +108,23 @@ class NciPbsProExecutor extends PbsExecutor {
         String id = null
         String status = null
         text.eachLine { line ->
-            // 8414746.r-man2  vs2870   express- exp16m100   10956   1  16  100gb 24:00 R 19:50
+            /*
+            r-man2:
+                                                                        Req'd  Req'd   Elap
+            Job ID          Username Queue    Jobname    SessID NDS TSK Memory Time  S Time
+            --------------- -------- -------- ---------- ------ --- --- ------ ----- - -----
+            8453988.r-man2  vs2870   normalbw c14m100     14650   1  14  100gb 48:00 R 24:06
+            8479227.r-man2  vs2870   normalbw nf-MapRead  48299   1  28   80gb 48:00 Q 02:27
+            8479228.r-man2  vs2870   normalbw nf-MapRead  36449   1  28   80gb 48:00 H 02:27
+            */
             def group = (line =~ /(\S+)\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(\S+).*/)
             if (group.size() > 0 && group[0].size() >= 2) {
                 id = group[0][1]
-                status = group[0][2]
+                if (id != "Job" && id != "---------------") {
+                    status = group[0][2]
+                    result.put( id, decode(status) ?: QueueStatus.UNKNOWN )
+                }
             }
-            result.put( id, decode(status) ?: QueueStatus.UNKNOWN )
         }
 
         return result
