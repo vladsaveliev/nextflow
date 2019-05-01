@@ -82,6 +82,19 @@ class NciPbsProExecutor extends PbsExecutor {
     }
 
     @Override
+    String getHeaders( TaskRun task ) {
+        String result = super.getHeaders(task)
+
+        // Exporting PATH
+        String path = System.getenv("PATH")
+        result += "export PATH=\"\$PATH:${path}\"\n"
+
+        // Changing to working directory
+        result += "cd ${quote(task.workDir)}\n"
+        return result
+    }
+
+    @Override
     protected List<String> queueStatusCommand(Object queue) {
         String cmd = 'qstat -u $USER'
         return ['bash','-c', "set -o pipefail; $cmd".toString()]

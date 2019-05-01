@@ -27,11 +27,11 @@ import nextflow.processor.TaskRun
  * @author Lorenz Gerber <lorenzottogerber@gmail.com>
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
-class PbsProExecutorTest extends Specification {
+class NciPbsProExecutorTest extends Specification {
 
     def 'should get directives' () {
         given:
-        def executor = Spy(PbsProExecutor)
+        def executor = Spy(NciPbsProExecutorTest)
         def WORK_DIR = Paths.get('/here')
 
         def task = Mock(TaskRun)
@@ -45,15 +45,15 @@ class PbsProExecutorTest extends Specification {
         1 * executor.quote( WORK_DIR.resolve(TaskRun.CMD_LOG)) >> '/here/.command.log'
 
         result == [
-                '-N', 'my-name',
-                '-o', '/here/.command.log',
-                '-j', 'oe'
+            '-N', 'my-name',
+            '-o', '/here/.command.log',
+            '-j', 'oe'
         ]
     }
 
     def 'should get directives with queue' () {
         given:
-        def executor = Spy(PbsProExecutor)
+        def executor = Spy(NciPbsProExecutorTest)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -67,16 +67,16 @@ class PbsProExecutorTest extends Specification {
         1 * executor.quote( WORK_DIR.resolve(TaskRun.CMD_LOG)) >> '/foo/bar/.command.log'
 
         result == [
-                '-N', 'foo',
-                '-o', '/foo/bar/.command.log',
-                '-j', 'oe',
-                '-q', 'my-queue'
+            '-N', 'foo',
+            '-o', '/foo/bar/.command.log',
+            '-j', 'oe',
+            '-q', 'my-queue'
         ]
     }
 
     def 'should get directives with cpus' () {
         given:
-        def executor = Spy(PbsProExecutor)
+        def executor = Spy(NciPbsProExecutorTest)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -89,19 +89,18 @@ class PbsProExecutorTest extends Specification {
         1 * executor.getJobNameFor(task) >> 'foo'
         1 * executor.quote( WORK_DIR.resolve(TaskRun.CMD_LOG)) >> '/foo/bar/.command.log'
 
-        println(result)
         result == [
-                '-N', 'foo',
-                '-o', '/foo/bar/.command.log',
-                '-j', 'oe',
-                '-q', 'my-queue',
-                '-l', 'select=1:ncpus=4'
+            '-N', 'foo',
+            '-o', '/foo/bar/.command.log',
+            '-j', 'oe',
+            '-q', 'my-queue',
+            '-l', 'ncpus=4'
         ]
     }
 
     def 'should get directives with mem' () {
         given:
-        def executor = Spy(PbsProExecutor)
+        def executor = Spy(NciPbsProExecutorTest)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -115,17 +114,17 @@ class PbsProExecutorTest extends Specification {
         1 * executor.quote( WORK_DIR.resolve(TaskRun.CMD_LOG)) >> '/foo/bar/.command.log'
 
         result == [
-                '-N', 'foo',
-                '-o', '/foo/bar/.command.log',
-                '-j', 'oe',
-                '-q', 'my-queue',
-                '-l', 'select=1:mem=2048mb'
+            '-N', 'foo',
+            '-o', '/foo/bar/.command.log',
+            '-j', 'oe',
+            '-q', 'my-queue',
+            '-l', 'mem=2048mb'
         ]
     }
 
     def 'should get directives with cpus and mem' () {
         given:
-        def executor = Spy(PbsProExecutor)
+        def executor = Spy(NciPbsProExecutorTest)
         def WORK_DIR = Paths.get('/foo/bar')
 
         def task = Mock(TaskRun)
@@ -139,17 +138,18 @@ class PbsProExecutorTest extends Specification {
         1 * executor.quote( WORK_DIR.resolve(TaskRun.CMD_LOG)) >> '/foo/bar/.command.log'
 
         result == [
-                '-N', 'foo',
-                '-o', '/foo/bar/.command.log',
-                '-j', 'oe',
-                '-q', 'my-queue',
-                '-l', 'select=1:ncpus=8:mem=1024mb'
+            '-N', 'foo',
+            '-o', '/foo/bar/.command.log',
+            '-j', 'oe',
+            '-q', 'my-queue',
+            '-l', 'ncpus=8',
+            '-l', 'mem=1024mb'
         ]
     }
 
     def 'should return qstat command line' () {
         given:
-        def executor = [:] as PbsProExecutor
+        def executor = [:] as NciPbsProExecutorTest
 
         expect:
         executor.queueStatusCommand(null) == ['bash','-c', "set -o pipefail; qstat -f | { egrep '(Job Id:|job_state =)' || true; }"]
@@ -160,9 +160,9 @@ class PbsProExecutorTest extends Specification {
     def 'should parse queue status'() {
 
         setup:
-        def executor = [:] as PbsProExecutor
+        def executor = [:] as NciPbsProExecutorTest
         def text =
-                """
+            """
                 Job Id: 12.localhost
                     job_state = F
                 Job Id: 13.localhost
